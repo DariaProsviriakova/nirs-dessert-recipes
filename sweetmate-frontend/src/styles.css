@@ -461,6 +461,10 @@ h3 {
   background: rgba(255, 246, 235, 0.74);
 }
 
+.sidebar--admin {
+  background: #fff6eb;
+}
+
 .new-chat {
   display: flex;
   align-items: center;
@@ -487,6 +491,49 @@ h3 {
 .sidebar-section h2 {
   color: #6d352d;
   font-size: 1rem;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.admin-nav__label,
+.admin-eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-nav__label {
+  padding: 4px 10px 8px;
+}
+
+.admin-nav__item {
+  min-height: 42px;
+  padding: 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  font-weight: 750;
+}
+
+.admin-nav__item:hover,
+.admin-nav__item.is-active {
+  background: #f1e3d5;
+  color: var(--chocolate-dark);
+}
+
+.admin-nav__back {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--chocolate);
 }
 
 .chat-list,
@@ -1026,6 +1073,242 @@ h3 {
     var(--cream);
 }
 
+.admin-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  align-content: start;
+  gap: 22px;
+  padding: 30px clamp(20px, 3vw, 42px);
+  overflow-y: auto;
+  background: rgba(255, 253, 248, 0.78);
+}
+
+.admin-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-eyebrow {
+  margin-bottom: 8px;
+  color: var(--caramel);
+}
+
+.admin-header h1 {
+  margin: 0;
+  color: var(--chocolate-dark);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.15rem;
+}
+
+.admin-header p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.admin-demo-badge {
+  padding: 8px 11px;
+  border: 1px solid rgba(122, 53, 41, 0.2);
+  border-radius: 6px;
+  background: #f8efe3;
+  color: var(--chocolate);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-notice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--caramel);
+  background: #f8efe3;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.admin-notice span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-metric {
+  display: grid;
+  min-width: 0;
+  min-height: 112px;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.admin-metric > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.admin-metric strong {
+  overflow-wrap: anywhere;
+  color: var(--chocolate-dark);
+  font-size: 1.4rem;
+}
+
+.admin-metric small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.admin-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  scroll-margin-top: 18px;
+}
+
+.admin-section__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.admin-section__heading h2 {
+  margin: 0;
+  color: var(--chocolate-dark);
+  font-size: 1.1rem;
+}
+
+.admin-section__heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.admin-section__heading > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.admin-recipe-list,
+.admin-status-list {
+  display: grid;
+}
+
+.admin-recipe-row {
+  display: grid;
+  grid-template-columns: 28px 48px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-recipe-rank {
+  color: var(--caramel);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.admin-recipe-row img {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.admin-recipe-info {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.admin-recipe-info strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.admin-recipe-info > span:not(.admin-meter) {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-meter {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #efe4d9;
+}
+
+.admin-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--caramel);
+}
+
+.admin-status-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-status-list dt {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.admin-status-list dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.admin-status-list dd.is-local {
+  color: #765036;
+}
+
+.admin-privacy-note {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .profile-card {
   display: grid;
   gap: 22px;
@@ -1234,6 +1517,14 @@ h3 {
   .chat-panel {
     min-height: 0;
   }
+
+  .admin-panel {
+    min-height: 0;
+  }
+
+  .admin-content-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
@@ -1369,5 +1660,32 @@ h3 {
 
   .danger-button {
     width: 100%;
+  }
+
+  .admin-panel {
+    gap: 16px;
+    padding: 20px 16px 28px;
+  }
+
+  .admin-header h1 {
+    font-size: 1.85rem;
+  }
+
+  .admin-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .admin-metric {
+    min-height: 106px;
+    padding: 12px;
+  }
+
+  .admin-metric strong {
+    font-size: 1.15rem;
+  }
+
+  .admin-section {
+    padding: 14px;
   }
 }

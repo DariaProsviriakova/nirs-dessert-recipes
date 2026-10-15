@@ -37,7 +37,6 @@ nirs-dessert-recipes/
     |-- tsconfig.json
     |-- public/images/
     `-- src/
-        |-- main.tsx
         |-- App.tsx
         `-- styles.css
 ```

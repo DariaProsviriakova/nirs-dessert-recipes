@@ -1,4 +1,6 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, StrictMode, useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
 
 type Recipe = {
   id: string;
@@ -29,7 +31,7 @@ type Chat = {
 };
 
 type AuthMode = 'login' | 'register';
-type View = 'chat' | 'auth' | 'profile';
+type View = 'chat' | 'auth' | 'profile' | 'admin';
 
 const storageKeys = {
   chats: 'sweetmate:chats',
@@ -39,6 +41,12 @@ const storageKeys = {
   profileName: 'sweetmate:profileName',
   user: 'sweetmate:user',
   email: 'sweetmate:email',
+};
+
+const adminDemoAccount = {
+  email: 'admin@sweetmate.test',
+  password: 'admin123',
+  displayName: 'Администратор',
 };
 
 const exampleQuestion =
@@ -496,10 +504,15 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
 function App() {
   const [user, setUser] = useState<string>(() => {
     const storedEmail = localStorage.getItem(storageKeys.email) || '';
-    return localStorage.getItem(storageKeys.user) || getStoredDisplayName(storedEmail);
+    return localStorage.getItem(storageKeys.user) ||
+      (normalizeEmail(storedEmail) === adminDemoAccount.email
+        ? adminDemoAccount.displayName
+        : getStoredDisplayName(storedEmail));
   });
   const [userEmail, setUserEmail] = useState<string>(() => localStorage.getItem(storageKeys.email) || '');
-  const [view, setView] = useState<View>('chat');
+  const [view, setView] = useState<View>(() =>
+    normalizeEmail(localStorage.getItem(storageKeys.email) || '') === adminDemoAccount.email ? 'admin' : 'chat',
+  );
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -528,12 +541,17 @@ function App() {
   const [repeatNewPassword, setRepeatNewPassword] = useState('');
   const [profileNameInput, setProfileNameInput] = useState(() => {
     const storedEmail = localStorage.getItem(storageKeys.email) || '';
-    return localStorage.getItem(storageKeys.user) || getStoredDisplayName(storedEmail);
+    return localStorage.getItem(storageKeys.user) ||
+      (normalizeEmail(storedEmail) === adminDemoAccount.email
+        ? adminDemoAccount.displayName
+        : getStoredDisplayName(storedEmail));
   });
   const [profileMessage, setProfileMessage] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const previousMessageStateRef = useRef<{ chatId: string; messageCount: number } | null>(null);
+  const wasViewingChatRef = useRef(false);
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? chats[0] ?? initialChat;
   const isGuest = !user;
@@ -555,7 +573,26 @@ function App() {
   useEffect(() => {
     const messages = messagesRef.current;
 
-    if (view === 'chat' && messages) {
+    if (view !== 'chat' || !messages) {
+      wasViewingChatRef.current = false;
+      return;
+    }
+
+    const previousState = previousMessageStateRef.current;
+    previousMessageStateRef.current = {
+      chatId: activeChat.id,
+      messageCount: activeChat.messages.length,
+    };
+
+    if (!wasViewingChatRef.current || !previousState || previousState.chatId !== activeChat.id) {
+      messages.scrollTo({ top: 0, behavior: 'auto' });
+      wasViewingChatRef.current = true;
+      return;
+    }
+
+    wasViewingChatRef.current = true;
+
+    if (previousState.messageCount < activeChat.messages.length) {
       messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' });
     }
   }, [activeChat.id, activeChat.messages.length, view]);
@@ -619,6 +656,12 @@ function App() {
     const normalizedEmail = normalizeEmail(email);
     const passwordKey = getScopedStorageKey(storageKeys.password, normalizedEmail);
     const savedPassword = localStorage.getItem(passwordKey);
+    const isAdminDemoAccount = normalizedEmail === adminDemoAccount.email;
+
+    if (isAdminDemoAccount && password !== (savedPassword || adminDemoAccount.password)) {
+      setAuthError('Для этого демо-аккаунта указан неверный пароль.');
+      return;
+    }
 
     if (authMode === 'login' && savedPassword && savedPassword !== password) {
       setAuthError('Неверный пароль. Проверьте данные и попробуйте снова.');
@@ -632,7 +675,7 @@ function App() {
 
     const userChats = getStoredChats(normalizedEmail);
     const userFavorites = getStoredFavorites(normalizedEmail);
-    const displayName = getStoredDisplayName(normalizedEmail);
+    const displayName = isAdminDemoAccount ? adminDemoAccount.displayName : getStoredDisplayName(normalizedEmail);
     localStorage.setItem(storageKeys.user, displayName);
     localStorage.setItem(storageKeys.email, normalizedEmail);
 
@@ -652,7 +695,7 @@ function App() {
     setFavorites(userFavorites);
     setPassword('');
     setConfirmPassword('');
-    setView('chat');
+    setView(isAdminDemoAccount ? 'admin' : 'chat');
   }
 
   function handleLogout() {
@@ -1067,7 +1110,26 @@ function App() {
         </header>
 
         <div className="workspace">
-          <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}>
+          <aside className={`sidebar ${view === 'admin' ? 'sidebar--admin' : ''} ${sidebarOpen ? 'is-open' : ''}`}>
+            {view === 'admin' ? (
+              <nav className="admin-nav" aria-label="Навигация окна администратора">
+                <p className="admin-nav__label">Управление</p>
+                <button
+                  className="admin-nav__item is-active"
+                  type="button"
+                  onClick={() => {
+                    document.getElementById('admin-title')?.scrollIntoView({ behavior: 'smooth' });
+                    setSidebarOpen(false);
+                  }}
+                >
+                  Обзор
+                </button>
+                <button className="admin-nav__item admin-nav__back" type="button" onClick={() => setView('chat')}>
+                  Вернуться в чат
+                </button>
+              </nav>
+            ) : (
+              <>
             <button
               className="new-chat"
               type="button"
@@ -1175,6 +1237,8 @@ function App() {
                 ))}
               </div>
             </section>
+              </>
+            )}
           </aside>
 
           {view === 'profile' ? (
@@ -1270,6 +1334,88 @@ function App() {
                     Выйти
                   </button>
                 </div>
+              </div>
+            </section>
+          ) : view === 'admin' ? (
+            <section className="admin-panel" aria-labelledby="admin-title">
+              <header className="admin-header">
+                <div>
+                  <p className="admin-eyebrow">Окно администратора</p>
+                  <h1 id="admin-title">Обзор</h1>
+                  <p>Состояние каталога и демонстрационных данных SweetMate.</p>
+                </div>
+                <span className="admin-demo-badge">Демо-окно</span>
+              </header>
+
+              <div className="admin-notice" role="note">
+                <strong>Только демонстрационные данные.</strong>
+                <span>Это окно открывается для специального демо-аккаунта. Серверной проверки прав и общей аналитики пока нет.</span>
+              </div>
+
+              <div className="admin-metrics" aria-label="Сводные показатели">
+                <article className="admin-metric">
+                  <span>Рецептов в каталоге</span>
+                  <strong>{recipeLibrary.length}</strong>
+                  <small>Локальный каталог</small>
+                </article>
+                <article className="admin-metric">
+                  <span>Популярность</span>
+                  <strong>В браузере</strong>
+                  <small>Демо-счётчики рецептов</small>
+                </article>
+                <article className="admin-metric">
+                  <span>Общие запросы</span>
+                  <strong>Нет данных</strong>
+                  <small>Серверная аналитика не подключена</small>
+                </article>
+                <article className="admin-metric">
+                  <span>Пользователи</span>
+                  <strong>Нет данных</strong>
+                  <small>Серверного учёта нет</small>
+                </article>
+              </div>
+
+              <div className="admin-content-grid">
+                <section className="admin-section" id="admin-recipes" aria-labelledby="admin-recipes-title">
+                  <div className="admin-section__heading">
+                    <div>
+                      <h2 id="admin-recipes-title">Популярные рецепты</h2>
+                      <p>Счётчики хранятся в текущем браузере и не являются общей статистикой.</p>
+                    </div>
+                    <span>{popularDesserts.length} из {recipeLibrary.length}</span>
+                  </div>
+                  <div className="admin-recipe-list">
+                    {popularDesserts.map((recipe, index) => (
+                      <div className="admin-recipe-row" key={recipe.id}>
+                        <span className="admin-recipe-rank">{String(index + 1).padStart(2, '0')}</span>
+                        <img src={recipe.image} alt="" />
+                        <div className="admin-recipe-info">
+                          <strong>{recipe.title}</strong>
+                          <span>{recipe.requestCount.toLocaleString('ru-RU')} демо-запросов</span>
+                          <span className="admin-meter" aria-hidden="true">
+                            <span style={{ width: `${Math.round((recipe.requestCount / popularDesserts[0].requestCount) * 100)}%` }} />
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="admin-section" id="admin-status" aria-labelledby="admin-status-title">
+                  <div className="admin-section__heading">
+                    <div>
+                      <h2 id="admin-status-title">Состояние сервисов</h2>
+                      <p>Что сейчас подключено в проекте.</p>
+                    </div>
+                  </div>
+                  <dl className="admin-status-list">
+                    <div><dt>Каталог рецептов</dt><dd className="is-local">Локально</dd></div>
+                    <div><dt>Поиск</dt><dd className="is-local">В браузере</dd></div>
+                    <div><dt>LLM и RAG</dt><dd>Не подключены</dd></div>
+                    <div><dt>Общая аналитика</dt><dd>Не подключена</dd></div>
+                  </dl>
+                  <p className="admin-privacy-note">Личные переписки, тексты запросов, email и избранное пользователей здесь не отображаются.</p>
+                </section>
               </div>
             </section>
           ) : (
@@ -1377,3 +1523,9 @@ function App() {
 }
 
 export default App;
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
