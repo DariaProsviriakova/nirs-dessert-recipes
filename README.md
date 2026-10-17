@@ -22,13 +22,26 @@ nirs-dessert-recipes/
 |-- CHANGE_HISTORY.md
 |-- docs/
 |   |-- README.md
-|   `-- Product/
+|   |-- Product/
+|   |   |-- README.md
+|   |   |-- 01-context.md
+|   |   |-- 02-users-and-scenarios.md
+|   |   |-- 03-requirements.md
+|   |   |-- 04-interface-and-behavior.md
+|   |   `-- 05-rules-and-data-meaning.md
+|   |-- Service/
+|   |   |-- README.md
+|   |   |-- decisions.md
+|   |   |-- sources.md
+|   |   `-- verification.md
+|   `-- Tech/
 |       |-- README.md
-|       |-- 01-context.md
-|       |-- 02-users-and-scenarios.md
-|       |-- 03-requirements.md
-|       |-- 04-interface-and-behavior.md
-|       `-- 05-rules-and-data-meaning.md
+|       |-- 01-architecture.md
+|       |-- 02-running.md
+|       |-- 03-data.md
+|       |-- 04-api-and-access.md
+|       |-- 05-verification.md
+|       `-- WORKSPACE_MAP.md
 `-- sweetmate-frontend/
     |-- index.html
     |-- package.json
@@ -56,7 +69,9 @@ npm run dev
 ## Документы
 
 - [Product-документация](docs/Product/README.md) — назначение раздела и ссылки на отдельные документы.
-- [Карта документации](docs/README.md) — вход в Product-раздел.
+- [Service-документация](docs/Service/README.md) — решения, открытые вопросы, источники и протокол проверок.
+- [Tech-документация](docs/Tech/README.md) — архитектура, запуск, данные, доступ и карта репозитория.
+- [Карта документации](docs/README.md) — вход в разделы Product, Service и Tech.
 - [Статус проекта](STATUS.md) — что реализовано и какие ограничения проверены.
 - [Правила работы](AGENTS.md) — порядок изменения кода и документации.
 - [История изменений](CHANGE_HISTORY.md) — записи по датам.
