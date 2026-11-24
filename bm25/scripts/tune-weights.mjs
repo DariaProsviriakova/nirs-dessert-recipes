@@ -48,6 +48,18 @@ function mean(values) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
+function summarize(items) {
+  const positive = items.filter((item) => item.relevantCount > 0);
+  const noMatch = items.filter((item) => item.relevantCount === 0);
+  return {
+    queries: items.length,
+    queryCount: items.length,
+    macroRecallAt5: mean(positive.map((item) => item.recallAt5)),
+    mrrAt10: mean(positive.map((item) => item.reciprocalRankAt10)),
+    noMatchAccuracy: mean(noMatch.map((item) => item.noMatchCorrect)),
+  };
+}
+
 function scoreConfiguration(configuration) {
   index.scoring = { ...index.scoring, fieldBoosts: configuration.fieldBoosts };
   const cases = benchmark.queries.map((item) => {
@@ -57,28 +69,31 @@ function scoreConfiguration(configuration) {
     const firstRelevant = results.findIndex(({ recipe }) => relevant.has(recipe.id));
     return {
       type: item.type,
+      labelSource: item.labelSource ?? 'unspecified',
       relevantCount: relevant.size,
       recallAt5: relevant.size ? foundAtCutoff / relevant.size : null,
       reciprocalRankAt10: relevant.size ? (firstRelevant < 0 ? 0 : 1 / (firstRelevant + 1)) : null,
       noMatchCorrect: relevant.size === 0 ? Number(results.length === 0) : null,
     };
   });
-  const positive = cases.filter((item) => item.relevantCount > 0);
-  const noMatch = cases.filter((item) => item.relevantCount === 0);
+  const byLabelSource = {};
+  for (const source of [...new Set(cases.map((item) => item.labelSource))]) {
+    byLabelSource[source] = summarize(cases.filter((item) => item.labelSource === source));
+  }
   const byType = {};
   for (const type of [...new Set(cases.map((item) => item.type))]) {
-    const items = cases.filter((item) => item.type === type);
-    const typePositive = items.filter((item) => item.relevantCount > 0);
-    byType[type] = {
-      recallAt5: mean(typePositive.map((item) => item.recallAt5)),
-      mrrAt10: mean(typePositive.map((item) => item.reciprocalRankAt10)),
-    };
+    byType[type] = summarize(cases.filter((item) => item.type === type));
   }
+  const overall = summarize(cases);
   return {
     name: configuration.name,
-    macroRecallAt5: mean(positive.map((item) => item.recallAt5)),
-    mrrAt10: mean(positive.map((item) => item.reciprocalRankAt10)),
-    noMatchAccuracy: mean(noMatch.map((item) => item.noMatchCorrect)),
+    macroRecallAt5: overall.macroRecallAt5,
+    mrrAt10: overall.mrrAt10,
+    noMatchAccuracy: overall.noMatchAccuracy,
+    manualQueryCount: byLabelSource.manual?.queryCount ?? 0,
+    manualMacroRecallAt5: byLabelSource.manual?.macroRecallAt5 ?? null,
+    manualMrrAt10: byLabelSource.manual?.mrrAt10 ?? null,
+    byLabelSource,
     byType,
   };
 }
@@ -87,10 +102,11 @@ const results = configurations.map(scoreConfiguration);
 const output = {
   corpusDocumentCount: index.documentCount,
   benchmarkQueryCount: benchmark.queries.length,
+  tuningBasis: 'Manual natural-language queries drive comparisons; field-derived criteria remain a separate diagnostic.',
   relevanceLabels: 'same fixed data/benchmark.json for every configuration',
   results,
   generatedAt: new Date().toISOString(),
 };
 await mkdir(resultsDir, { recursive: true });
 await writeFile(outputPath, JSON.stringify(output, null, 2) + '\n', 'utf8');
-console.log(JSON.stringify({ results, outputPath }, null, 2));
+console.log(JSON.stringify({ tuningBasis: output.tuningBasis, results, outputPath }, null, 2));
