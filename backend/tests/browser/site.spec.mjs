@@ -21,7 +21,7 @@ test('guest isolation, register, real BM25, recipe, favorites, chats and profile
   await page.evaluate(()=>{localStorage.setItem('sweetmate:user','old-demo-user');localStorage.setItem('sweetmate:email','admin@sweetmate.test');});
   await page.reload();
   await expect(page.getByRole('button',{name:'Отправить',exact:true})).toHaveCount(0);
-  await expect(page.getByText('Просмотр примера',{exact:true})).toBeVisible();
+  await expect(page.getByText('Просмотр',{exact:true})).toBeVisible();
   await register(page);
   await page.getByLabel('Задайте вопрос о десертах').fill('банан до 30 минут без сахара');
   await page.getByRole('button',{name:'Отправить',exact:true}).click();
@@ -108,7 +108,7 @@ test('password change, logout, new login, delete only synthetic account',async({
   await profile(page);
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Удалить учетную запись',exact:true}).click();
-  await expect(page.getByText('Просмотр примера',{exact:true})).toBeVisible();
+  await expect(page.getByText('Просмотр',{exact:true})).toBeVisible();
 });
 
 test('impossible ingredient combination is not replaced with unrelated recipes; composer stays visible',async({page})=>{
@@ -119,7 +119,7 @@ test('impossible ingredient combination is not replaced with unrelated recipes; 
     await page.getByLabel('Задайте вопрос о десертах').fill(query);
     await page.getByRole('button',{name:'Отправить',exact:true}).click();
     await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(0);
-    await expect(page.locator('.message--assistant').last()).toContainText('нет вариантов со всеми указанными продуктами');
+    await expect(page.locator('.message--assistant').last()).toContainText('Со всеми перечисленными продуктами подходящих вариантов не нашлось');
     await expect(page.getByLabel('Задайте вопрос о десертах')).toBeInViewport();
     await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeInViewport();
   }
@@ -253,4 +253,84 @@ test('all-chat recipe memory survives another search, selecting details, reload 
  const fresh=await sendTurn(page,'сколько по времени готовит');
  expect(fresh.status).toBe('clarification');
  expect(fresh.context.knownRecipeIds).toEqual([]);
+});
+
+test('guest example, demo user and isolated demo admin support complete role transitions',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');
+ await expect(page.getByText('Просмотр',{exact:true})).toBeVisible();
+ await expect(page.locator('.recipe-card')).toHaveCount(3);
+ await expect(page.getByRole('button',{name:'Отправить',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await expect(page.getByText('Демо-режим',{exact:true})).toBeVisible();
+ const me=await (await page.request.get('/api/auth/me')).json();
+ expect(me.role).toBe('user');expect(me.demo).toBe(true);
+ expect((await page.request.get('/api/admin/stats')).status()).toBe(403);
+ const result=await sendTurn(page,'есть банан и молоко');
+ expect(result.recipes.length).toBeGreaterThan(0);
+ await page.locator('.recipe-card').first().getByRole('button',{name:'Добавить в избранное'}).click();
+ await page.reload();
+ await expect(page.getByText('Демо-режим',{exact:true})).toBeVisible();
+ await expect(page.locator('.favorite-entry')).toHaveCount(1);
+ await page.locator('.user-menu__button').click();
+ await page.getByRole('button',{name:'Выйти',exact:true}).click();
+ await expect(page.getByText('Просмотр',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Посмотреть как администратор',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();
+ await expect(page.getByText('Демо-режим · только просмотр',{exact:true})).toBeVisible();
+ const stats=await (await page.request.get('/api/admin/stats')).json();
+ expect(stats.requests).toBe(1);
+ await page.screenshot({path:'backend/.test-artifacts/demo-admin.png',fullPage:true,animations:'disabled'});
+ await page.getByRole('button',{name:'Вернуться в чат',exact:true}).click();
+ await expect(page.getByText('Демо-режим',{exact:true})).toBeVisible();
+ expect(await page.locator('.favorite-entry').count()).toBe(0);
+ expect(errors).toEqual([]);
+});
+test('documented admin demo login and guest test buttons work on mobile',async({page})=>{
+ await page.setViewportSize({width:360,height:800});
+ await page.goto('/');
+ await page.locator('.topbar').getByRole('button',{name:'Войти',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Тестовый пользователь',exact:true})).toBeVisible();
+ await page.getByLabel('Электронная почта').fill('admin@sweetmate.test');
+ await page.getByLabel('Пароль',{exact:true}).fill('admin123');
+ await page.getByRole('button',{name:'Войти',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'backend/.test-artifacts/demo-mobile.png',fullPage:true,animations:'disabled'});
+});
+
+test('demo popular starters keep original photos before and after real searches and reload',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeVisible();
+ const starter=page.locator('.popular-card').first();
+ await expect(starter).toContainText('Тирамису');
+ await expect(starter.locator('img')).toHaveAttribute('src','/images/tiramisu.jpg');
+ await expect.poll(()=>starter.locator('img').evaluate(img=>img.complete && img.naturalWidth>0)).toBe(true);
+ await sendTurn(page,'есть банан и молоко');
+ await expect(starter).toContainText('Тирамису');
+ await page.reload();
+ await expect(starter.locator('img')).toHaveAttribute('src','/images/tiramisu.jpg');
+ await starter.click();
+ await expect(page.locator('.recipe-detail h3').last()).toHaveText('Тирамису');
+ const time=await sendTurn(page,'сколько по времени готовить?');
+ expect(time.context.selectedRecipeId).toBe('tiramisu');
+ expect(time.action).toBe('discuss');
+});
+test('nut allergy produces new recommendations and confirmation preserves the restriction',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeVisible();
+ await sendTurn(page,'есть шоколад и орехи');
+ let result=await sendTurn(page,'у меня аллергия на орехи, предложи что то без них');
+ expect(result.action).toBe('search');
+ expect(result.context.allergies).toContain('орехи');
+ if(result.context.pendingAction)result=await sendTurn(page,'да');
+ expect(result.recipes.length).toBeGreaterThan(0);
+ for(const r of result.recipes) expect(r.ingredientEntries.some(i=>/орех|миндаль|фундук|арахис|кешью|фисташ|пекан|макадам/iu.test(i.name))).toBe(false);
+ await page.reload();
+ const retry=await sendTurn(page,'рецепт без орехов');
+ expect(retry.context.allergies).toContain('орехи');
+ expect(retry.recipes.length).toBeGreaterThan(0);
+ for(const r of retry.recipes) expect(r.ingredientEntries.some(i=>/орех|миндаль|фундук|арахис|кешью|фисташ|пекан|макадам/iu.test(i.name))).toBe(false);
 });

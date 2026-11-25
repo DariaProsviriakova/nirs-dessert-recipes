@@ -60,6 +60,9 @@ const storageKeys = {
   favorites: 'sweetmate:v2:favorites',
 };
 
+const guestExampleQuestion =
+  'У меня есть бананы, овсяные хлопья и немного тёмного шоколада. Что можно приготовить на десерт?';
+
 const exampleQuestion = 'У меня есть банан и молоко. Что можно приготовить?';
 
 const recipeLibrary: Recipe[] = [
@@ -202,12 +205,80 @@ const recipeLibrary: Recipe[] = [
 
 const bananaRecipes = recipeLibrary.slice(0, 3);
 
+function normalizeGuestRecipeText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getGuestRecipeScore(recipe: Recipe, question: string) {
+  const normalizedQuestion = normalizeGuestRecipeText(question);
+  const words = normalizedQuestion.split(/[^a-zа-я0-9]+/i).filter(Boolean);
+  const title = normalizeGuestRecipeText(recipe.title);
+  const aliases = recipe.aliases.map(normalizeGuestRecipeText);
+  const searchable = normalizeGuestRecipeText(
+    [recipe.title, recipe.description, recipe.tag, recipe.difficulty, ...recipe.ingredients, ...recipe.aliases].join(' '),
+  );
+
+  const exactBonus = [title, ...aliases].some((item) => normalizedQuestion.includes(item)) ? 40 : 0;
+  const wordScore = words.reduce((score, word) => {
+    if (title.includes(word)) {
+      return score + 8;
+    }
+
+    if (aliases.some((alias) => alias.includes(word))) {
+      return score + 6;
+    }
+
+    if (searchable.includes(word)) {
+      return score + 2;
+    }
+
+    return score;
+  }, 0);
+
+  return exactBonus + wordScore;
+}
+
+function findGuestExactRecipe(question: string) {
+  const normalizedQuestion = normalizeGuestRecipeText(question);
+
+  return recipeLibrary.find((recipe) => normalizedQuestion.includes(normalizeGuestRecipeText(recipe.title)));
+}
+
+function selectGuestRecipesForQuestion(question: string) {
+  return recipeLibrary
+    .map((recipe) => ({ recipe, score: getGuestRecipeScore(recipe, question) }))
+    .sort((a, b) => b.score - a.score || b.recipe.requestCount - a.recipe.requestCount)
+    .slice(0, 3)
+    .map(({ recipe }) => ({ ...recipe }));
+}
+
+function getGuestResponseForQuestion(question: string) {
+  const exactRecipe = findGuestExactRecipe(question);
+
+  if (exactRecipe) {
+    return {
+      text: `Конечно, вот полный рецепт: ${exactRecipe.title}.`,
+      recipeDetail: { ...exactRecipe },
+    };
+  }
+
+  return {
+    text:
+      'Я подобрала 3 варианта из библиотеки рецептов. Выберите карточку, и я открою полный рецепт следующим сообщением в чате.',
+    recipes: selectGuestRecipesForQuestion(question),
+  };
+}
+
 const mockResponses: Message[] = [
   {
     id: 'response-bananas',
     role: 'assistant',
-    text: 'Пример запроса по продуктам. У маффинов в составе есть банан и молоко; также потребуются другие ингредиенты. После входа можно подобрать рецепты и уточнять пожелания в чате.',
-    recipes: [recipeLibrary[1]],
+    ...getGuestResponseForQuestion(guestExampleQuestion),
   },
   {
     id: 'response-berries',
@@ -301,12 +372,12 @@ type FavoriteRecipe = {
 
 const initialChat: Chat = {
   id: 'chat-example',
-  title: 'Пример: банан и молоко',
+  title: 'Идеи из бананов и овсянки',
   messages: [
     {
       id: 'example-user',
       role: 'user',
-      text: exampleQuestion,
+      text: guestExampleQuestion,
     },
     mockResponses[0],
   ],
@@ -460,6 +531,8 @@ function App() {
   const [userEmail, setUserEmail] = useState('');
   const [accountId, setAccountId] = useState('');
   const [role, setRole] = useState<'user' | 'admin' | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const [view, setView] = useState<View>('chat');
   const [authLoading, setAuthLoading] = useState(true);
   const [authPending, setAuthPending] = useState(false);
@@ -490,9 +563,11 @@ function App() {
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? chats[0] ?? initialChat;
   const isGuest = !user;
+  const sidebarPopular = (isGuest || isDemo) ? [...recipeLibrary].sort((a, b) => b.requestCount - a.requestCount).slice(0, 4) : popularDesserts;
   const displayName = user || 'Гость';
   const userInitial = user ? user.slice(0, 1).toUpperCase() : '?';
   function acceptAccount(account: Account) {
+    setIsDemo(account.demo === true);
     identity.current = account.id;
     setUser(account.displayName); setUserEmail(account.email); setAccountId(account.id); setRole(account.role);
     setProfileNameInput(account.displayName);
@@ -504,6 +579,7 @@ function App() {
   }
 
   function clearAccount() {
+    setIsDemo(false);
     identity.current = '';
     pendingRequest.current?.abort(); pendingRequest.current = null; setPending(false);
     setUser(''); setUserEmail(''); setAccountId(''); setRole(null);
@@ -513,6 +589,7 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
+    api<{ demoEnabled: boolean }>('/health', { signal: controller.signal }).then(value => setDemoEnabled(value.demoEnabled)).catch(() => {});
     api<Account>('/auth/me', { signal: controller.signal }).then(acceptAccount).catch(error => {
       if (error instanceof ApiError && error.status !== 401) setRequestError(error.message);
     }).finally(() => { if (!controller.signal.aborted) setAuthLoading(false); });
@@ -594,6 +671,18 @@ function App() {
       localStorage.setItem(getScopedStorageKey(storageKeys.favorites, accountId), JSON.stringify(favorites));
     }
   }, [favorites, accountId]);
+
+  async function handleDemoLogin(demoRole: 'user' | 'admin') {
+    if (authPending) return;
+    setAuthPending(true); setAuthError(''); setRequestError('');
+    try {
+      const account = await api<Account>('/demo/login', { method: 'POST', body: JSON.stringify({ role: demoRole }) });
+      acceptAccount(account); setSidebarOpen(false);
+    } catch (error) {
+      if (view === 'auth') setAuthError((error as Error).message);
+      else setRequestError((error as Error).message);
+    } finally { setAuthPending(false); }
+  }
 
   async function handleAuthSubmit(event: FormEvent) {
     event.preventDefault();
@@ -899,6 +988,11 @@ function App() {
             <button className="primary-button" type="submit" disabled={authPending}>
               {authPending ? 'Подождите…' : authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
             </button>
+            {demoEnabled && <div className="demo-entry">
+              <p>Тестовые режимы — без регистрации</p>
+              <button type="button" className="secondary-button" disabled={authPending} onClick={() => handleDemoLogin('user')}>Тестовый пользователь</button>
+              <button type="button" className="secondary-button" disabled={authPending} onClick={() => handleDemoLogin('admin')}>Тестовый администратор</button>
+            </div>}
           </form>
         </section>
       </main>
@@ -1068,9 +1162,9 @@ function App() {
 
             <section className="sidebar-section">
               <h2>Популярные десерты</h2>
-              {!popularDesserts.length && <p className="sidebar-note">Пока нет статистики поиска.</p>}
+              {!sidebarPopular.length && <p className="sidebar-note">Пока нет статистики поиска.</p>}
               <div className="popular-list">
-                {popularDesserts.map((dessert) => (
+                {sidebarPopular.map((dessert) => (
                   <button
                     className="popular-card"
                     key={dessert.id}
@@ -1085,7 +1179,7 @@ function App() {
                       <span className="popular-meter" aria-hidden="true">
                         <span
                           style={{
-                            width: `${Math.round((dessert.requestCount / Math.max(1, popularDesserts[0].requestCount)) * 100)}%`,
+                            width: `${Math.round((dessert.requestCount / Math.max(1, sidebarPopular[0].requestCount)) * 100)}%`,
                           }}
                         />
                       </span>
@@ -1194,7 +1288,7 @@ function App() {
               </div>
             </section>
           ) : view === 'admin' ? (
-            <AdminPanel />
+            <AdminPanel demo={isDemo} />
           ) : (
             <section className="chat-panel" aria-label="Чат с Dessert AI">
               <div className="chat-header">
@@ -1202,7 +1296,7 @@ function App() {
                   <h1>Чат с Dessert AI</h1>
                   <p>Задавайте вопросы о десертах, получайте рекомендации и вдохновляйтесь новыми идеями.</p>
                 </div>
-                <span className="chat-status">{authLoading ? 'Проверяем вход…' : isGuest ? 'Просмотр примера' : 'Поиск по рецептам'}</span>
+                <span className="chat-status">{authLoading ? 'Проверяем вход…' : isGuest ? 'Просмотр' : isDemo ? 'Демо-режим' : 'Поиск по рецептам'}</span>
               </div>
 
               <div className="messages" aria-live="polite" ref={messagesRef}>
@@ -1260,6 +1354,7 @@ function App() {
                 ))}
                 {pending && <p className="search-status" role="status">Подбираем рецепты и готовим объяснение…</p>}
               </div>
+              {isDemo && <p className="demo-notice" role="note">Демо-режим: тестовые данные отделены от личных аккаунтов и сбрасываются после перезапуска сервера.</p>}
               {isGuest ? (
                 <div className="guest-composer">
                   <div>
@@ -1286,6 +1381,10 @@ function App() {
                   >
                     Зарегистрироваться
                   </button>
+                  {demoEnabled && <div className="demo-entry demo-entry--guest">
+                    <button type="button" className="secondary-button" disabled={authPending || authLoading} onClick={() => handleDemoLogin('user')}>Попробовать как пользователь</button>
+                    <button type="button" className="secondary-button" disabled={authPending || authLoading} onClick={() => handleDemoLogin('admin')}>Посмотреть как администратор</button>
+                  </div>}
                 </div>
               ) : (
                 <form className="composer" onSubmit={handleSend}>

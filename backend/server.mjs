@@ -1,3 +1,5 @@
+import {withDemoRecipes} from './demo-catalog.mjs';
+import {demoSpaces,demoRole} from './demo.mjs';
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
@@ -30,7 +32,8 @@ async function body(req,maxBytes=16384) {
 export async function createApp({settings=config(),db=openStore(settings.dbPath),search=openSearch(settings.indexPath),llm=makeLLM(settings)}={}) {
   await bootstrapAdmin(db,settings);
   prune(db,settings.analyticsDays);
-  const authAttempts=new Map(),searchAttempts=new Map();
+  const demos=demoSpaces(settings);
+  const authAttempts=new Map(),searchAttempts=new Map(),demoAttempts=new Map();
   function limit(map,key,max) {
     const now=Date.now(),previous=map.get(key);
     const entry=!previous || previous.until<now ? {count:0,until:now+60000} : previous;
@@ -54,9 +57,19 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
               (req.headers.origin && !settings.origins.has(req.headers.origin))) throw new ApiError(403,'Недопустимый источник запроса.');
         }
         if (route==='/api/health' && method==='GET') {
-          return send(res,200,{status:'ok',search:'ready',catalogSize:search.size,llm:llm.configured ? 'configured' : 'not_configured'});
+          return send(res,200,{status:'ok',search:'ready',catalogSize:search.size,demoEnabled:Boolean(settings.demoEnabled),llm:llm.configured ? 'configured' : 'not_configured'});
         }
-        const session=currentSession(db,req);
+        const demoSpace=demos.resolve(req);
+        let requestDb=demoSpace?.db || db;
+        let isDemo=Boolean(demoSpace);
+        const requestSearch=isDemo?withDemoRecipes(search):search;
+        const accountResponse=account=>({...publicAccount(account),demo:isDemo});
+        const session=currentSession(requestDb,req);
+        if(route==='/api/demo/login' && method==='POST') {
+          limit(demoAttempts,req.socket.remoteAddress,30);
+          const data=await body(req),result=await demos.login(req,data.role);
+          return send(res,200,result.account,result.cookies);
+        }
         const requireAccount=()=>{
           if (!session) throw new ApiError(401,'Войдите в аккаунт.');
           return session.account;
@@ -65,30 +78,38 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
           limit(authAttempts,req.socket.remoteAddress,15);
           const data=await body(req),email=emailAddress(data.email);
           if (typeof data.password!=='string' || data.password.length>128 || !data.password) throw new ApiError(400,'Укажите пароль.');
+          const testRole=settings.demoEnabled?demoRole(email,data.password):null;
+          if(testRole) {
+            if(route.endsWith('register') && data.password!==data.confirmPassword)throw new ApiError(400,'Пароли не совпадают.');
+            const result=await demos.login(req,testRole);
+            return send(res,200,result.account,result.cookies);
+          }
+          // Real forms always use the normal database, even after trying a demo.
+          requestDb=db;isDemo=false;
           let account;
           if (route.endsWith('register')) {
             passwordValue(data.password);
             if (data.password!==data.confirmPassword) throw new ApiError(400,'Пароли не совпадают.');
-            if (db.prepare('SELECT id FROM accounts WHERE email=?').get(email)) throw new ApiError(409,'Аккаунт уже существует. Войдите или укажите другую почту.');
+            if (requestDb.prepare('SELECT id FROM accounts WHERE email=?').get(email)) throw new ApiError(409,'Аккаунт уже существует. Войдите или укажите другую почту.');
             const hash=await hashPassword(data.password);
             const id=randomUUID();
-            try { db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?)').run(id,email,email.split('@')[0].slice(0,32),hash,'user',new Date().toISOString()); }
+            try { requestDb.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?)').run(id,email,email.split('@')[0].slice(0,32),hash,'user',new Date().toISOString()); }
             catch (error) {
-              if (db.prepare('SELECT id FROM accounts WHERE email=?').get(email)) throw new ApiError(409,'Аккаунт уже существует.');
+              if (requestDb.prepare('SELECT id FROM accounts WHERE email=?').get(email)) throw new ApiError(409,'Аккаунт уже существует.');
               throw error;
             }
-            account=db.prepare('SELECT * FROM accounts WHERE id=?').get(id);
+            account=requestDb.prepare('SELECT * FROM accounts WHERE id=?').get(id);
           } else {
-            account=db.prepare('SELECT * FROM accounts WHERE email=?').get(email);
+            account=requestDb.prepare('SELECT * FROM accounts WHERE email=?').get(email);
             // Equal-cost password verification even if an email is unknown.
             const valid=await verifyPassword(data.password,account?.password_hash || '00000000000000000000000000000000:'+ '00'.repeat(64));
             if (!account || !valid) throw new ApiError(401,'Неверная почта или пароль.');
           }
-          return send(res,route.endsWith('register') ? 201 : 200,publicAccount(account),sessionCookie(createSession(db,account.id,settings),settings));
+          return send(res,route.endsWith('register') ? 201 : 200,accountResponse(account),[sessionCookie(createSession(requestDb,account.id,settings),settings),demos.clearCookie]);
         }
-        if (route==='/api/auth/me' && method==='GET') return send(res,200,publicAccount(requireAccount()));
+        if (route==='/api/auth/me' && method==='GET') return send(res,200,accountResponse(requireAccount()));
         if (route==='/api/auth/logout' && method==='POST') {
-          if (session) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.hash);
+          if (session) requestDb.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.hash);
           return send(res,204,undefined,sessionCookie('',settings));
         }
         if (route==='/api/profile' && method==='PATCH') {
@@ -96,8 +117,8 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
           if (typeof data.displayName!=='string') throw new ApiError(400,'Введите имя.');
           const name=data.displayName.trim().replace(/\s+/g,' ');
           if (!name || name.length>32) throw new ApiError(400,'Имя должно содержать от 1 до 32 символов.');
-          db.prepare('UPDATE accounts SET display_name=? WHERE id=?').run(name,account.id);
-          return send(res,200,publicAccount(db.prepare('SELECT * FROM accounts WHERE id=?').get(account.id)));
+          requestDb.prepare('UPDATE accounts SET display_name=? WHERE id=?').run(name,account.id);
+          return send(res,200,accountResponse(requestDb.prepare('SELECT * FROM accounts WHERE id=?').get(account.id)));
         }
         if (route==='/api/profile/password' && method==='POST') {
           const account=requireAccount(),data=await body(req);
@@ -105,27 +126,27 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
           if (data.newPassword!==data.confirmPassword) throw new ApiError(400,'Пароли не совпадают.');
           if (typeof data.currentPassword!=='string' || data.currentPassword.length>128 ||
               !await verifyPassword(data.currentPassword,account.password_hash)) throw new ApiError(400,'Текущий пароль неверен.');
-          db.prepare('UPDATE accounts SET password_hash=? WHERE id=?').run(await hashPassword(data.newPassword),account.id);
-          db.prepare('DELETE FROM sessions WHERE account_id=?').run(account.id);
-          return send(res,204,undefined,sessionCookie(createSession(db,account.id,settings),settings));
+          requestDb.prepare('UPDATE accounts SET password_hash=? WHERE id=?').run(await hashPassword(data.newPassword),account.id);
+          requestDb.prepare('DELETE FROM sessions WHERE account_id=?').run(account.id);
+          return send(res,204,undefined,sessionCookie(createSession(requestDb,account.id,settings),settings));
         }
         if (route==='/api/profile' && method==='DELETE') {
           const account=requireAccount();
-          db.prepare('DELETE FROM accounts WHERE id=?').run(account.id);
+          requestDb.prepare('DELETE FROM accounts WHERE id=?').run(account.id);
           return send(res,204,undefined,sessionCookie('',settings));
         }
         if (route==='/api/admin/stats' && method==='GET') {
           if (requireAccount().role!=='admin') throw new ApiError(403,'Нет доступа.');
-          prune(db,settings.analyticsDays);
-          return send(res,200,{...snapshot(db,settings.analyticsDays,search),services:{search:'ready',llm:llm.configured ? 'configured' : 'not_configured'}});
+          prune(requestDb,settings.analyticsDays);
+          return send(res,200,{...snapshot(requestDb,settings.analyticsDays,requestSearch),services:{search:'ready',llm:llm.configured ? 'configured' : 'not_configured'}});
         }
         if (route==='/api/recipes/popular' && method==='GET') {
           requireAccount();
-          return send(res,200,snapshot(db,settings.analyticsDays,search).popular.slice(0,4));
+          return send(res,200,snapshot(requestDb,settings.analyticsDays,requestSearch).popular.slice(0,4));
         }
         if (route.startsWith('/api/recipes/') && method==='GET') {
           requireAccount();
-          const recipe=search.recipe(decodeURIComponent(route.slice('/api/recipes/'.length)));
+          const recipe=requestSearch.recipe(decodeURIComponent(route.slice('/api/recipes/'.length)));
           if (!recipe) throw new ApiError(404,'Рецепт не найден.');
           return send(res,200,recipe);
         }
@@ -135,23 +156,23 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
           const data=await body(req,1024*1024);
           if (typeof data.query!=='string' || !data.query.trim() || [...data.query].length>500) throw new ApiError(400,'Введите вопрос длиной от 1 до 500 символов.');
           const query=data.query.trim(),queryId=randomUUID(),eventId=randomUUID(),submittedAt=new Date().toISOString();
-          prune(db,settings.analyticsDays);
-          db.prepare('INSERT INTO events(id,account_id,session_id,query_id,submitted_at,status) VALUES (?,?,?,?,?,?)')
+          prune(requestDb,settings.analyticsDays);
+          requestDb.prepare('INSERT INTO events(id,account_id,session_id,query_id,submitted_at,status) VALUES (?,?,?,?,?,?)')
             .run(eventId,account.id,session.hash,queryId,submittedAt,'processing');
           let result;
           try {
             const history=Array.isArray(data.history)?data.history.slice(-6).filter(m=>m && ['user','assistant'].includes(m.role) && typeof m.text==='string').map(m=>({role:m.role,text:m.text.slice(0,400)})):[];
-            result=await converse({query,context:data.context,history,search,llm});
+            result=await converse({query,context:data.context,history,search:requestSearch,llm});
             const recipes=result.recipes || [];
-            db.exec('BEGIN');
+            requestDb.exec('BEGIN');
             try {
-              for (const recipe of recipes) db.prepare('INSERT INTO result_recipes VALUES (?,?)').run(eventId,recipe.id);
-              db.prepare('UPDATE events SET status=?,duration_ms=? WHERE id=?').run(result.status,Date.now()-started,eventId);
-              db.exec('COMMIT');
-            } catch(error) { db.exec('ROLLBACK');throw error; }
+              for (const recipe of recipes) requestDb.prepare('INSERT INTO result_recipes VALUES (?,?)').run(eventId,recipe.id);
+              requestDb.prepare('UPDATE events SET status=?,duration_ms=? WHERE id=?').run(result.status,Date.now()-started,eventId);
+              requestDb.exec('COMMIT');
+            } catch(error) { requestDb.exec('ROLLBACK');throw error; }
             return send(res,200,{queryId,...result});
           } catch(error) {
-            db.prepare("UPDATE events SET status='error',duration_ms=? WHERE id=?").run(Date.now()-started,eventId);
+            requestDb.prepare("UPDATE events SET status='error',duration_ms=? WHERE id=?").run(Date.now()-started,eventId);
             throw error;
           }
         }
@@ -179,7 +200,7 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
     }
   });
   server.requestTimeout=30000;server.headersTimeout=10000;
-  return {server,db,close:()=>new Promise(resolve=>server.close(()=>{db.close();resolve();}))};
+  return {server,db,close:()=>new Promise(resolve=>server.close(()=>{demos.close();db.close();resolve();}))};
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const settings=config();

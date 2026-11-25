@@ -1,7 +1,7 @@
 import {recipeMemory,resolveRecipeReference,rememberRecipes} from './recipe-memory.mjs';
 import { phraseKey,tokenize } from '../bm25/src/text.mjs';
 import { parseQuery } from '../bm25/src/query.mjs';
-import { ingredientMatches,macroValues,rounded } from './recipe-data.mjs';
+import { ingredientMatches,ingredientExcluded,macroValues,rounded } from './recipe-data.mjs';
 
 const FOOD=[
  ['банан',/банан/u],['молоко',/молок/u],['мука',/мук[аиу]|мука/u],['орехи',/орех/u],
@@ -19,7 +19,7 @@ const list=value=>Array.isArray(value)?[...new Set(value.filter(x=>typeof x==='s
 export function cleanContext(value,search) {
   const c=value && typeof value==='object'?value:{};
   const ids=Array.isArray(c.displayedIds)?c.displayedIds.filter(id=>typeof id==='string' && search.raw?.(id)).slice(0,3):[];
-  return {version:3,...recipeMemory(c,search),ingredients:list(c.ingredients),excludedIngredients:list(c.excludedIngredients),
+  return {version:3,...recipeMemory(c,search),ingredients:list(c.ingredients).filter(x=>!/аллерги|предлож|пожалуй|приготов|что то|что нибудь|без них/iu.test(x)),excludedIngredients:list(c.excludedIngredients),allergies:list(c.allergies),pendingAction:c.pendingAction?.type==='broaden_search'?{type:'broaden_search'}:null,
     topic:typeof c.topic==='string'?c.topic.slice(0,300):'',displayedIds:ids,
     selectedRecipeId:typeof c.selectedRecipeId==='string' && search.raw?.(c.selectedRecipeId)?c.selectedRecipeId:null,
     servings:Number.isInteger(c.servings) && c.servings>0 && c.servings<=100?c.servings:null,
@@ -47,6 +47,7 @@ function knownFoods(query) {
   return FOOD.map(([name,re])=>({name,index:q.search(re)})).filter(x=>x.index>=0).sort((a,b)=>a.index-b.index).map(x=>x.name);
 }
 function inventoryFoods(query) {
+  if(/аллерги|непереносимост/iu.test(query))return null;
   const match=query.match(/(?:у меня(?:\s+есть)?|(?:^|\s)есть|имеются|в наличии)\s+(.+)/iu);
   if(!match)return null;
   const body=match[1].split(/[?.!]|(?:,?\s+)(?:что можно|что приготовить|что посоветуешь|хочу приготовить|хочу сделать)/iu)[0];
@@ -57,6 +58,23 @@ function inventoryFoods(query) {
     return known.length===1?known[0]:clean;
   }).filter(Boolean);
   return list(foods);
+}
+function allergyFoods(query) {
+  if(/(?:нет|не бывает|не было)\s+аллерги/iu.test(query))return [];
+  const result=[];
+  for(const match of query.matchAll(/(?:аллерги[а-яё]*|непереносимост[а-яё]*)\s+на\s+([^,.!?;]+)/giu)) {
+    for(const item of match[1].split(/\s+и\s+/iu)) {
+      const known=knownFoods(item);
+      result.push(...(known.length?known:[item.trim()]));
+    }
+  }
+  return list(result);
+}
+function confirmation(query) {
+  const q=phraseKey(query);
+  if(/^(?:да|ага|угу|давай|давайте|конечно|хорошо|подбери|подбирай|попробуй|согласна|согласен)(?: |$)/u.test(q))return true;
+  if(/^(?:нет|не надо|не нужно|отмена)(?: |$)/u.test(q))return false;
+  return null;
 }
 function portions(query) {
   const q=phraseKey(query);const numbers={одного:1,один:1,двух:2,два:2,троих:3,трех:3,три:3,четырех:4,четыре:4,пять:5,пятерых:5,шесть:6,шестерых:6,семь:7,восемь:8,девять:9,десять:10};
@@ -75,13 +93,29 @@ function canonicalNutrition(recipe,query) {
 export async function converse({query,context,history=[],search,llm}) {
   const state=cleanContext(context,search),prior={...state};
   const text=phraseKey(query),targetServings=portions(query);
+  const declaredAllergies=allergyFoods(query);
+  const rememberedAllergies=history.filter(m=>m.role==='user').flatMap(m=>allergyFoods(m.text || ''));
+  state.allergies=list([...state.allergies,...rememberedAllergies,...declaredAllergies]);
+  const yes=confirmation(query);
+  const previousOffer=[...history].reverse().find(m=>m.role==='assistant')?.text || '';
+  const oldOffer=yes===true && /\?/u.test(previousOffer) && /(?:могу|хотите|может|давай|давайте|предлагаю).*(?:убрать|исключить|друг|отдельно|подобрать|поиск)/iu.test(previousOffer);
+  const confirmBroader=yes===true && Boolean(state.pendingAction);
+  if(yes===false && state.pendingAction) {
+    state.pendingAction=null;
+    return answerResult('found','Хорошо, сохраняю текущие ограничения. Напишите, какие продукты или условия можно изменить.',[],null,null,state,'not_needed','chat');
+  }
+  if(confirmBroader) {state.ingredients=[];state.topic='десерт';state.pendingAction=null;}
+  state.excludedIngredients=list([...state.excludedIngredients,...state.allergies]);
   let parsed=parseQuery(query);
   if(state.pendingNutritionQuery && /100 ?г|на порци/u.test(text))parsed=parseQuery(state.pendingNutritionQuery+' '+query);
   const excluded=knownFoods(query).filter(food=>parsed.exclusions.some(group=>group.some(term=>tokenize(food).includes(term))));
+  excluded.push(...declaredAllergies);
+  if(/без них|без этого|без таких/iu.test(query))excluded.push(...state.allergies);
   const foods=knownFoods(query).filter(food=>!excluded.includes(food));
   if(parsed.exclusions.some(group=>group.includes('выпечк') || group.includes('духовк')))excluded.push('выпечка');
   let action=null,understood=null;
-  if(/меньше.*калори|менее калори|низкокалори|самый легкий|самое легкое|сравни.*калори/u.test(text))action='calories';
+  if(declaredAllergies.length || confirmBroader || oldOffer)action='search';
+  else if(/меньше.*калори|менее калори|низкокалори|самый легкий|самое легкое|сравни.*калори/u.test(text))action='calories';
   else if(/кбжу|бжу|калорийност|сколько.*калори|белков|белка|углеводов|жиров|пищевая ценность/u.test(text))action='nutrition';
   else if(state.pendingNutritionRequest && /^(?:у )?(?:перв|втор|трет|послед)|^на 100|^на порци/u.test(text))action='nutrition';
   else if(targetServings)action='servings';
@@ -125,13 +159,18 @@ export async function converse({query,context,history=[],search,llm}) {
     state.selectedRecipeId=null;
     if(simpleInventory || (!understood && foods.length && !prior.ingredients.length)) {
       state.ingredients=simpleInventory?inventory:foods;
-      state.excludedIngredients=excluded;
+      state.excludedIngredients=list([...excluded,...state.allergies]);
       state.topic=state.ingredients.join(' ');state.filters={};state.sort='relevance';state.selectedRecipeId=null;
     } else if(!understood && foods.length && /добав|еще/u.test(text))state.ingredients=list([...state.ingredients,...foods]);
     else if(!understood && !foods.length && !prior.ingredients.length)state.topic=parsed.searchText;
-    state.excludedIngredients=list([...state.excludedIngredients,...excluded]);
-    state.ingredients=state.ingredients.filter(food=>!state.excludedIngredients.some(ex=>ingredientMatches(ex,food)));
+    state.pendingAction=null;
+    state.excludedIngredients=list([...state.excludedIngredients,...excluded,...state.allergies]);
+    state.ingredients=state.ingredients.filter(food=>!state.excludedIngredients.some(ex=>ingredientExcluded(ex,food)));
   }
+  state.excludedIngredients=list([...state.excludedIngredients,...state.allergies]);
+  if(action==='search' && (declaredAllergies.length || oldOffer || excluded.some(ex=>ingredientExcluded(ex,state.topic))))
+    state.topic=state.ingredients.filter(food=>!state.excludedIngredients.some(ex=>ingredientExcluded(ex,food))).join(' ') || 'десерт';
+  state.ingredients=state.ingredients.filter(food=>!state.allergies.some(ex=>ingredientExcluded(ex,food)));
   if(parsed.clarificationRequired) {
     state.pendingNutritionQuery=query;
     return answerResult('clarification','Уточните, КБЖУ нужны на 100 г или на порцию.',[],null,null,state,'not_needed');
@@ -257,7 +296,17 @@ export async function converse({query,context,history=[],search,llm}) {
         sort:state.sort,requireServings:Boolean(state.servings)}).slice(0,3);
       fallback=records.length?'Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?':
         'Среди найденных десертов нет вариантов со всеми указанными продуктами и ограничениями. Какой продукт можно убрать или заменить?';
-      if(!records.length)status='empty';
+      if(!records.length) {
+        status='empty';
+        const broader=state.ingredients.length?search.find({ingredients:[],excludedIngredients:state.excludedIngredients,topic:'десерт',filters:state.filters,requireServings:Boolean(state.servings)}):[];
+        if(state.allergies.length)fallback='В доступном каталоге не нашлось вариантов с этими условиями. Исключение продуктов '+state.allergies.join(', ')+' сохраняю; можно изменить остальные продукты или условия.';
+        if(broader.length) {
+          state.pendingAction={type:'broaden_search'};
+          fallback='Со всеми перечисленными продуктами подходящих вариантов не нашлось.'+
+            (state.excludedIngredients.length?' Исключения сохраняю: '+state.excludedIngredients.join(', ')+'.':'')+
+            ' Подобрать другие десерты, не ограничиваясь этим списком продуктов?';
+        }
+      }
     }
   }
   const cards=records.map(r=>search.present(r.id,{ingredients:state.ingredients,servings:state.servings}));
@@ -265,10 +314,10 @@ export async function converse({query,context,history=[],search,llm}) {
   if(cards.length===1 && action==='choose')state.selectedRecipeId=cards[0].id;
   rememberRecipes(state,[...new Set([...cards.map(r=>r.id),...(detail?[detail.id]:[]),...(nutrition?[nutrition.recipeId]:[])])],
     {group:['search','calories'].includes(action)});
-  const result={action,status,recipes:cards,recipeDetail:detail,nutrition,discussion,notes,fallback};
+  const result={action,status,pendingAction:state.pendingAction,allergies:state.allergies,recipes:cards,recipeDetail:detail,nutrition,discussion,notes,fallback};
   // Numeric replies are composed from canonical source values. Free-form generation
   // cannot reliably preserve the comparison winner, basis, or scaled quantities.
-  const factual=['nutrition','calories','servings','clarification'].includes(action) || (action==='discuss' && !discussion);
+  const factual=['nutrition','calories','servings','clarification'].includes(action) || (action==='discuss' && !discussion) || (action==='search' && status==='empty');
   let generation={answer:null,llmStatus:factual?'not_needed':'not_configured'};
   if(!factual && llm.reply)generation=await llm.reply(query,state,history,result);
   // Free-form search/selection text must not introduce another numeric nutrition
@@ -296,6 +345,11 @@ export async function converse({query,context,history=[],search,llm}) {
     const inventedHundred=/(?:порци[а-яё]*|вес[а-яё]*)\s*(?:составляет|весит|равен|около|примерно|—|-|это)?\s*100\s*г/iu.test(answer);
     if(claimedWeight || inventedHundred || !numbers.every(n=>allowed.includes(n)))generation.answer=null;
     else if(!noWeight)generation.answer+=' Вес одной порции в граммах в источнике не указан.';
+  }
+  if(state.allergies.length && records.length && ['search','choose','calories'].includes(action)) {
+    if(/безопасн|гипоаллерген|гарант|можно.*аллерги/iu.test(generation.answer || ''))generation.answer=null;
+    const note='В подборе исключены указанные продукты: '+state.allergies.join(', ')+'. Это проверка состава из источника; возможные следы аллергенов в готовых продуктах не проверены.';
+    generation.answer=(generation.answer || fallback)+' '+note;
   }
   // Structured numbers are always rendered separately from the conversational explanation.
   return answerResult(status,generation.answer || fallback,['nutrition','clarification'].includes(action)?[]:cards,detail,nutrition,state,generation.llmStatus,action);

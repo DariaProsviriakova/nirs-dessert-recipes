@@ -1,4 +1,4 @@
-export type Account = { id: string; email: string; displayName: string; role: 'user' | 'admin' };
+export type Account = { id: string; email: string; displayName: string; role: 'user' | 'admin'; demo?: boolean };
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }

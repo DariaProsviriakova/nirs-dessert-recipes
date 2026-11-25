@@ -7,7 +7,7 @@ type Stats = {
   period: { from: string; to: string; days: number; timeZone: string };
   services: { search: string; llm: string };
 };
-export function AdminPanel() {
+export function AdminPanel({ demo = false }: { demo?: boolean }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -25,8 +25,8 @@ export function AdminPanel() {
   }, []);
   return <section className="admin-panel" aria-labelledby="admin-title">
     <header className="admin-header"><div><p className="admin-eyebrow">Окно администратора</p>
-      <h1 id="admin-title">Обзор</h1><p>Агрегированная статистика поиска SweetMate.</p></div>
-      <span className="admin-demo-badge">Только просмотр</span></header>
+      <h1 id="admin-title">Обзор</h1><p>{demo ? 'Тестовый обзор каталога и запросов этого демо-сеанса.' : 'Агрегированная статистика поиска SweetMate.'}</p></div>
+      <span className="admin-demo-badge">{demo ? 'Демо-режим · только просмотр' : 'Только просмотр'}</span></header>
     {error && <p role="alert" className="form-error">{error} Последние показатели могут быть неактуальны.</p>}
     {!stats ? <p role="status">Загружаем статистику…</p> : <>
       <p className="admin-privacy-note">Период: {new Date(stats.period.from).toLocaleDateString('ru-RU')} — {new Date(stats.period.to).toLocaleDateString('ru-RU')}; последние {stats.period.days} дней. Группировка дней: UTC.</p>

@@ -34,7 +34,7 @@ export function makeSearch(sourceIndex) {
     raw:id=>byId.get(id) || null,
     present:(id,options)=>presentRecipe(byId.get(id),options),
     find({ingredients=[],excludedIngredients=[],topic='',filters={},sort='relevance',basis='per100g',requireServings=false}={}) {
-      const query=[topic,...ingredients].filter(Boolean).join(' ');
+      const query=!ingredients.length && /^(?:рецепт[а-яё]*|десерт[а-яё]*)(?:\s+рецепт[а-яё]*|\s+десерт[а-яё]*)?$/iu.test(topic.trim())?'':[topic,...ingredients].filter(Boolean).join(' ');
       const parsed=parseQuery(query);
       const scores=new Map(query?searchRecipes(index,query,{...parsed,limit:100}).map(r=>[r.recipe.id,r.score]):[]);
       let candidates=[...byId.values()].filter(r=>{

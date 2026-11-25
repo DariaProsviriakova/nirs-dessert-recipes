@@ -12,7 +12,7 @@ function ingredientInfo(value) {
   }
   return info;
 }
-const nutNames=/орех|миндаль|фундук|арахис|кешью|фисташ|пекан/iu;
+const nutNames=/орех|миндаль|фундук|арахис|кешью|фисташ|пекан|макадам|каштан/iu;
 export function ingredientMatches(wanted,name) {
   const wantedInfo=ingredientInfo(wanted),nameInfo=ingredientInfo(name);
   const q=wantedInfo.normalized,n=nameInfo.normalized;

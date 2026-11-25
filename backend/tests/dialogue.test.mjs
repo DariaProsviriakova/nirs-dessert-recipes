@@ -333,3 +333,52 @@ test('a new search cannot falsely say the user has chosen a dish from old histor
  assert.equal(result.context.selectedRecipeId,null);
  assert(result.recipes.length);
 });
+
+test('allergy is an exclusion, never a pantry item; yes executes the concrete broader-search offer',async()=>{
+ const first=await turn('есть мука и орехи и молоко');
+ const excluded=await turn('у меня аллергия на орехи, предложи что то без них',first.context);
+ assert.equal(excluded.action,'search');
+ assert.deepEqual(excluded.context.allergies,['орехи']);
+ assert(!excluded.context.ingredients.some(x=>/орех|аллерги|предлож/iu.test(x)));
+ assert(excluded.context.excludedIngredients.includes('орехи'));
+ assert.equal(excluded.context.pendingAction.type,'broaden_search');
+ const yes=await turn('да',excluded.context);
+ assert.equal(yes.action,'search');assert.equal(yes.status,'found');
+ assert(yes.recipes.length);
+ assert(yes.recipes.every(r=>!r.ingredientEntries.some(i=>ingredientExcluded('орехи',i.name))));
+ const again=await turn('рецепт без орехов',yes.context);
+ assert(again.recipes.length);
+ assert(again.recipes.every(r=>!r.ingredientEntries.some(i=>ingredientExcluded('орехи',i.name))));
+});
+test('allergy survives a fresh pantry and cannot be removed by intent model output',async()=>{
+ const first=await turn('у меня аллергия на орехи');
+ const fresh=await turn('есть банан и молоко',first.context);
+ assert(fresh.context.allergies.includes('орехи'));
+ assert(fresh.context.excludedIngredients.includes('орехи'));
+ const next=await converse({query:'еще варианты',context:fresh.context,search,llm:{
+  interpret:async()=>({action:'search',ingredients:['банан','молоко','орехи'],excludedIngredients:[]}),
+  reply:async()=>({answer:'Гарантированно безопасно при аллергии.',llmStatus:'ok'})
+ }});
+ assert(next.context.excludedIngredients.includes('орехи'));
+ assert(!next.context.ingredients.includes('орехи'));
+ assert(!next.answer.includes('Гарантированно безопасно'));
+ assert(next.recipes.every(r=>!r.ingredientEntries.some(i=>ingredientExcluded('орехи',i.name))));
+});
+test('legacy yes recovers allergy restriction from recent conversation instead of rejecting the answer',async()=>{
+ const result=await converse({query:'да',context:{ingredients:['орехи','предложи что то без них'],topic:'орехи'},
+  history:[
+   {role:'user',text:'у меня аллергия на орехи, предложи что то без них'},
+   {role:'assistant',text:'К сожалению, среди найденных рецептов нет подходящих для тебя. Могу предложить убрать орехи из рассмотрения?'},
+  ],search,llm});
+ assert.equal(result.action,'search');
+ assert(result.recipes.length);
+ assert(result.recipes.every(r=>!r.ingredientEntries.some(i=>ingredientExcluded('орехи',i.name))));
+});
+test('declining a concrete offer preserves restrictions without starting a new search',async()=>{
+ const pending=await turn('есть банан и дуриан');
+ assert.equal(pending.context.pendingAction.type,'broaden_search');
+ const no=await turn('нет',pending.context);
+ assert.equal(no.context.pendingAction,null);
+ assert.deepEqual(no.context.ingredients,pending.context.ingredients);
+ assert.deepEqual(no.recipes,[]);
+});

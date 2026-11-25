@@ -8,6 +8,7 @@ export function config(env = process.env) {
     return n;
   };
   return {
+    demoEnabled: env.DEMO_MODE !== 'false',
     host: env.HOST || '127.0.0.1', port: positive('PORT', 8000, 65535),
     dbPath: path.resolve(ROOT, env.DB_PATH || 'backend/.data/sweetmate.sqlite'),
     indexPath: path.resolve(ROOT, env.INDEX_PATH || 'bm25/data/generated/bm25-index.json.gz'),
