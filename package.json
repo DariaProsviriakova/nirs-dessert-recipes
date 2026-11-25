@@ -1,0 +1,19 @@
+{
+  "name": "sweetmate",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env backend/server.mjs",
+    "dev": "node --env-file-if-exists=.env --watch backend/server.mjs",
+    "test": "node --test backend/tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "build": "npm --prefix sweetmate-frontend run build",
+    "prepare:data": "npm --prefix bm25 ci && npm --prefix bm25 run download && npm --prefix bm25 run corpus && npm --prefix bm25 run index"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0"
+  }
+}

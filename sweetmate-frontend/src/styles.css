@@ -1689,3 +1689,41 @@ h3 {
     padding: 14px;
   }
 }
+
+/* API integration: existing layout and palette are preserved. */
+.app-shell { grid-template-rows: auto auto minmax(0, 1fr); }
+.composer { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.integration-error { margin: 0; padding: 10px 20px; color: #7a3529; background: #f8efe3; overflow-wrap: anywhere; }
+.search-status { margin: 0; padding: 8px 24px; color: #806c65; }
+.question-length { color: #806c65; white-space: nowrap; font-size: 12px; }
+button:disabled { cursor: wait; opacity: .65; }
+.recipe-card, .recipe-card__content, .message__bubble { min-width: 0; overflow-wrap: anywhere; }
+.recipe-detail a { color: #7a3529; text-decoration: underline; }
+@media (max-width: 680px) {
+  .composer { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .composer input { min-width: 0; grid-column: 1 / -1; }
+  .question-length { justify-self: end; }
+  .composer .send-button { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@media (max-width: 980px) {
+  .sidebar { background: #fff6eb; visibility: hidden; transition: transform 180ms ease, visibility 180ms; }
+  .sidebar.is-open { visibility: visible; }
+}
+
+.admin-panel .admin-recipe-row { grid-template-columns: 24px minmax(0, 1fr); }
+
+.assistant-text { white-space: pre-line; }
+.recipe-summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card-ingredients { margin: 8px 0; padding-left: 20px; color: var(--ink); line-height: 1.5; font-size: .88rem; }
+.ingredient-match { color: #496248 !important; font-weight: 700; }
+.ingredient-extra { color: var(--muted); font-size: .85rem; }
+.nutrition-result { margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: #fffaf3; }
+.nutrition-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.nutrition-values div { padding: 10px; background: white; border-radius: 10px; }
+.nutrition-values dt { color: var(--muted); }
+.nutrition-values dd { margin: 4px 0 0; font-weight: 750; }
+@media (max-width: 680px) { .nutrition-values { grid-template-columns: 1fr; } }

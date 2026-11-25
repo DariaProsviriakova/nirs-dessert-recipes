@@ -1,7 +1,17 @@
 import { FormEvent, StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import { api, ApiError, type Account } from './api';
+import { AdminPanel } from './AdminPanel';
 
+type MacroValues = { kcal: number | null; protein: number | null; fats: number | null; carbs: number | null };
+type ChatContext = {
+  version: number; ingredients: string[]; excludedIngredients: string[]; topic: string;
+  displayedIds: string[]; selectedRecipeId: string | null; servings: number | null;
+  filters: Record<string, unknown>; sort: string;
+  knownRecipeIds?: string[]; recipeGroups?: string[][];
+};
+type NutritionReply = { recipeId: string; title: string; basis: string; basisLabel: string; values: MacroValues | null };
 type Recipe = {
   id: string;
   title: string;
@@ -14,6 +24,16 @@ type Recipe = {
   steps: string[];
   requestCount: number;
   aliases: string[];
+  sourceUrl?: string | null;
+  checked?: boolean;
+  servings?: number | null;
+  nutrition?: { per100g?: MacroValues | null; perServing?: MacroValues | null; wholeDish?: MacroValues | null };
+  matchedIngredients?: string[];
+  additionalIngredients?: string[];
+  ingredientEntries?: { name: string; amount: string | null }[];
+  originalServings?: number | null;
+  scaled?: boolean;
+  portionNote?: string | null;
 };
 
 type Message = {
@@ -22,6 +42,8 @@ type Message = {
   text: string;
   recipes?: Recipe[];
   recipeDetail?: Recipe;
+  context?: ChatContext;
+  nutrition?: NutritionReply | null;
 };
 
 type Chat = {
@@ -34,23 +56,11 @@ type AuthMode = 'login' | 'register';
 type View = 'chat' | 'auth' | 'profile' | 'admin';
 
 const storageKeys = {
-  chats: 'sweetmate:chats',
-  favorites: 'sweetmate:favorites',
-  requestCounts: 'sweetmate:requestCounts',
-  password: 'sweetmate:password',
-  profileName: 'sweetmate:profileName',
-  user: 'sweetmate:user',
-  email: 'sweetmate:email',
+  chats: 'sweetmate:v2:chats',
+  favorites: 'sweetmate:v2:favorites',
 };
 
-const adminDemoAccount = {
-  email: 'admin@sweetmate.test',
-  password: 'admin123',
-  displayName: 'Администратор',
-};
-
-const exampleQuestion =
-  'У меня есть бананы, овсяные хлопья и немного тёмного шоколада. Что можно приготовить на десерт?';
+const exampleQuestion = 'У меня есть банан и молоко. Что можно приготовить?';
 
 const recipeLibrary: Recipe[] = [
   {
@@ -192,80 +202,12 @@ const recipeLibrary: Recipe[] = [
 
 const bananaRecipes = recipeLibrary.slice(0, 3);
 
-function normalizeRecipeText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[^a-zа-я0-9]+/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function getRecipeScore(recipe: Recipe, question: string) {
-  const normalizedQuestion = normalizeRecipeText(question);
-  const words = normalizedQuestion.split(/[^a-zа-я0-9]+/i).filter(Boolean);
-  const title = normalizeRecipeText(recipe.title);
-  const aliases = recipe.aliases.map(normalizeRecipeText);
-  const searchable = normalizeRecipeText(
-    [recipe.title, recipe.description, recipe.tag, recipe.difficulty, ...recipe.ingredients, ...recipe.aliases].join(' '),
-  );
-
-  const exactBonus = [title, ...aliases].some((item) => normalizedQuestion.includes(item)) ? 40 : 0;
-  const wordScore = words.reduce((score, word) => {
-    if (title.includes(word)) {
-      return score + 8;
-    }
-
-    if (aliases.some((alias) => alias.includes(word))) {
-      return score + 6;
-    }
-
-    if (searchable.includes(word)) {
-      return score + 2;
-    }
-
-    return score;
-  }, 0);
-
-  return exactBonus + wordScore;
-}
-
-function findExactRecipe(question: string) {
-  const normalizedQuestion = normalizeRecipeText(question);
-
-  return recipeLibrary.find((recipe) => normalizedQuestion.includes(normalizeRecipeText(recipe.title)));
-}
-
-function selectRecipesForQuestion(question: string) {
-  return recipeLibrary
-    .map((recipe) => ({ recipe, score: getRecipeScore(recipe, question) }))
-    .sort((a, b) => b.score - a.score || b.recipe.requestCount - a.recipe.requestCount)
-    .slice(0, 3)
-    .map(({ recipe }) => ({ ...recipe }));
-}
-
-function getResponseForQuestion(question: string) {
-  const exactRecipe = findExactRecipe(question);
-
-  if (exactRecipe) {
-    return {
-      text: `Конечно, вот полный рецепт: ${exactRecipe.title}.`,
-      recipeDetail: { ...exactRecipe },
-    };
-  }
-
-  return {
-    text:
-      'Я подобрала 3 варианта из библиотеки рецептов. Выберите карточку, и я открою полный рецепт следующим сообщением в чате.',
-    recipes: selectRecipesForQuestion(question),
-  };
-}
-
 const mockResponses: Message[] = [
   {
     id: 'response-bananas',
     role: 'assistant',
-    ...getResponseForQuestion(exampleQuestion),
+    text: 'Пример запроса по продуктам. У маффинов в составе есть банан и молоко; также потребуются другие ингредиенты. После входа можно подобрать рецепты и уточнять пожелания в чате.',
+    recipes: [recipeLibrary[1]],
   },
   {
     id: 'response-berries',
@@ -359,7 +301,7 @@ type FavoriteRecipe = {
 
 const initialChat: Chat = {
   id: 'chat-example',
-  title: 'Идеи из бананов и овсянки',
+  title: 'Пример: банан и молоко',
   messages: [
     {
       id: 'example-user',
@@ -392,28 +334,11 @@ function getGuestChats() {
 }
 
 function getStoredChats(ownerEmail: string) {
-  return ownerEmail ? readStorage(getScopedStorageKey(storageKeys.chats, ownerEmail), getGuestChats()) : getGuestChats();
+  return ownerEmail ? readStorage(getScopedStorageKey(storageKeys.chats, ownerEmail), [createEmptyChat()]) : getGuestChats();
 }
 
 function getStoredFavorites(ownerEmail: string) {
   return ownerEmail ? readStorage<string[]>(getScopedStorageKey(storageKeys.favorites, ownerEmail), []) : [];
-}
-
-function getFallbackDisplayName(ownerEmail: string) {
-  const normalizedEmail = normalizeEmail(ownerEmail);
-  const fallbackName = normalizedEmail.split('@')[0] || 'Анастасия';
-
-  return fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
-}
-
-function getStoredDisplayName(ownerEmail: string) {
-  if (!ownerEmail) {
-    return '';
-  }
-
-  const scopedName = localStorage.getItem(getScopedStorageKey(storageKeys.profileName, ownerEmail));
-
-  return scopedName || getFallbackDisplayName(ownerEmail);
 }
 
 function createId(prefix: string) {
@@ -425,22 +350,6 @@ function makeChatTitle(text: string) {
   return clean.length > 38 ? `${clean.slice(0, 38)}...` : clean || 'Новый чат';
 }
 
-function cloneResponse(question: string, _messageCount: number, requestCounts: Record<string, number>): Message {
-  const response = getResponseForQuestion(question);
-  const withRequestCount = (recipe: Recipe) => ({
-    ...recipe,
-    requestCount: requestCounts[recipe.id] ?? recipe.requestCount,
-  });
-
-  return {
-    id: createId('assistant'),
-    role: 'assistant',
-    text: response.text,
-    recipes: response.recipes?.map(withRequestCount),
-    recipeDetail: response.recipeDetail ? withRequestCount(response.recipeDetail) : undefined,
-  };
-}
-
 function createEmptyChat(): Chat {
   return {
     id: createId('chat'),
@@ -450,7 +359,7 @@ function createEmptyChat(): Chat {
         id: createId('assistant'),
         role: 'assistant',
         text:
-          'Расскажите, какие продукты есть под рукой или какое настроение у десерта. Я предложу несколько подходящих идей.',
+          'Напишите, что есть под рукой. Например: «У меня есть банан и молоко. Что можно приготовить?» Затем можно уточнить: «Где меньше калорий?», выбрать рецепт и попросить: «Покажи КБЖУ» или «На 6 человек».',
       },
     ],
   };
@@ -468,6 +377,44 @@ function Logo() {
   );
 }
 
+function chatContext(chat: Chat): ChatContext {
+  const saved = [...chat.messages].reverse().find(message => message.context)?.context;
+  const lastRecipes = [...chat.messages].reverse().find(message => message.recipes?.length || message.recipeDetail);
+  const fallback: ChatContext = {
+    version: 3, ingredients: [], excludedIngredients: [], topic: '',
+    displayedIds: lastRecipes?.recipes?.map(recipe => recipe.id) ?? (lastRecipes?.recipeDetail ? [lastRecipes.recipeDetail.id] : []),
+    selectedRecipeId: lastRecipes?.recipeDetail?.id ?? null, servings: lastRecipes?.recipeDetail?.servings ?? null,
+    filters: {}, sort: 'relevance',
+  };
+  const memoryContext = [...chat.messages].reverse().find(message => message.context?.recipeGroups)?.context;
+  const groups = memoryContext?.recipeGroups?.map(group => [...group]) ?? [];
+  const ids = new Set<string>(saved?.knownRecipeIds ?? []);
+  for (const message of chat.messages) {
+    const recipes = [...(message.recipes ?? []), ...(message.recipeDetail ? [message.recipeDetail] : [])];
+    recipes.forEach(recipe => ids.add(recipe.id));
+    if (message.nutrition) ids.add(message.nutrition.recipeId);
+    if (!memoryContext && message.recipes?.length) {
+      const group = message.recipes.map(recipe => recipe.id);
+      if (JSON.stringify(groups[groups.length - 1]) !== JSON.stringify(group)) groups.push(group);
+    }
+  }
+  return { ...(saved ?? fallback), knownRecipeIds: [...ids], recipeGroups: groups };
+}
+function NutritionTable({ data }: { data: NutritionReply }) {
+  const format = (value: number | null | undefined) => value == null ? 'Нет данных' : value.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  return <section className="nutrition-result" aria-label={'КБЖУ: ' + data.title}>
+    <h3>{data.title}: КБЖУ {data.basisLabel}</h3>
+    {!data.values ? <p>В источнике нет данных на этой базе. Значения не рассчитывались догадками.</p> :
+      <dl className="nutrition-values">
+        <div><dt>Калории</dt><dd>{format(data.values.kcal)} ккал</dd></div>
+        <div><dt>Белки</dt><dd>{format(data.values.protein)} г</dd></div>
+        <div><dt>Жиры</dt><dd>{format(data.values.fats)} г</dd></div>
+        <div><dt>Углеводы</dt><dd>{format(data.values.carbs)} г</dd></div>
+      </dl>}
+    <small>По данным источника. База расчёта указана явно.</small>
+  </section>;
+}
+
 function RecipeDetail({ recipe }: { recipe: Recipe }) {
   return (
     <section className="recipe-detail" aria-label={`Полный рецепт: ${recipe.title}`}>
@@ -476,9 +423,16 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
           <p className="eyebrow">Полный рецепт</p>
           <h3>{recipe.title}</h3>
         </div>
-        <span>{recipe.requestCount.toLocaleString('ru-RU')} запросов</span>
+        <span>{recipe.sourceUrl ? 'Данные источника' : 'Демонстрационный пример'}</span>
       </div>
       <p>{recipe.description}</p>
+      {recipe.sourceUrl && <p><a href={recipe.sourceUrl} target="_blank" rel="noreferrer">Источник: Поварёнок</a> · Рецепт не проходил ручную проверку.</p>}
+      {recipe.servings != null && <p>Порций: {recipe.servings}{recipe.scaled ? ' · ингредиенты пересчитаны с ' + recipe.originalServings + ' порций' : ''}</p>}
+      {recipe.portionNote && <p>{recipe.portionNote}</p>}
+      {recipe.scaled && <p>Количества берите из пересчитанного списка ингредиентов. Текст шагов сохранён из исходного рецепта.</p>}
+      {recipe.nutrition?.per100g && <p>На 100 г (по источнику): ккал {recipe.nutrition.per100g.kcal ?? 'нет данных'}, белки {recipe.nutrition.per100g.protein ?? 'нет данных'} г, жиры {recipe.nutrition.per100g.fats ?? 'нет данных'} г, углеводы {recipe.nutrition.per100g.carbs ?? 'нет данных'} г.</p>}
+      {!recipe.ingredients.length && <p>Ингредиенты в источнике не указаны.</p>}
+      {!recipe.steps.length && <p>Шаги в источнике не указаны. Проверьте оригинал рецепта.</p>}
       <div className="recipe-detail__grid">
         <div>
           <h4>Ингредиенты</h4>
@@ -502,50 +456,31 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
 }
 
 function App() {
-  const [user, setUser] = useState<string>(() => {
-    const storedEmail = localStorage.getItem(storageKeys.email) || '';
-    return localStorage.getItem(storageKeys.user) ||
-      (normalizeEmail(storedEmail) === adminDemoAccount.email
-        ? adminDemoAccount.displayName
-        : getStoredDisplayName(storedEmail));
-  });
-  const [userEmail, setUserEmail] = useState<string>(() => localStorage.getItem(storageKeys.email) || '');
-  const [view, setView] = useState<View>(() =>
-    normalizeEmail(localStorage.getItem(storageKeys.email) || '') === adminDemoAccount.email ? 'admin' : 'chat',
-  );
+  const [user, setUser] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [role, setRole] = useState<'user' | 'admin' | null>(null);
+  const [view, setView] = useState<View>('chat');
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authPending, setAuthPending] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [requestError, setRequestError] = useState('');
+  const [popularDesserts, setPopularDesserts] = useState<Recipe[]>([]);
+  const pendingRequest = useRef<AbortController | null>(null);
+  const identity = useRef('');
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  const [chats, setChats] = useState<Chat[]>(() => getStoredChats(localStorage.getItem(storageKeys.email) || ''));
-  const [activeChatId, setActiveChatId] = useState(
-    () => getStoredChats(localStorage.getItem(storageKeys.email) || '')[0]?.id ?? initialChat.id,
-  );
+  const [chats, setChats] = useState<Chat[]>(getGuestChats);
+  const [activeChatId, setActiveChatId] = useState(initialChat.id);
   const [input, setInput] = useState('');
-  const [favorites, setFavorites] = useState<string[]>(() =>
-    getStoredFavorites(localStorage.getItem(storageKeys.email) || ''),
-  );
-  const [requestCounts, setRequestCounts] = useState<Record<string, number>>(() => {
-    const savedCounts = readStorage<Record<string, number> | null>(storageKeys.requestCounts, null);
-
-    return Object.fromEntries(
-      recipeLibrary.map((recipe) => [
-        recipe.id,
-        savedCounts && Number.isFinite(savedCounts[recipe.id]) ? savedCounts[recipe.id] : recipe.requestCount,
-      ]),
-    );
-  });
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [repeatNewPassword, setRepeatNewPassword] = useState('');
-  const [profileNameInput, setProfileNameInput] = useState(() => {
-    const storedEmail = localStorage.getItem(storageKeys.email) || '';
-    return localStorage.getItem(storageKeys.user) ||
-      (normalizeEmail(storedEmail) === adminDemoAccount.email
-        ? adminDemoAccount.displayName
-        : getStoredDisplayName(storedEmail));
-  });
+  const [profileNameInput, setProfileNameInput] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -557,18 +492,39 @@ function App() {
   const isGuest = !user;
   const displayName = user || 'Гость';
   const userInitial = user ? user.slice(0, 1).toUpperCase() : '?';
-  const popularDesserts = useMemo(
-    () =>
-      recipeLibrary
-        .map((recipe) => ({ ...recipe, requestCount: requestCounts[recipe.id] ?? recipe.requestCount }))
-        .sort((a, b) => b.requestCount - a.requestCount)
-        .slice(0, 4),
-    [requestCounts],
-  );
+  function acceptAccount(account: Account) {
+    identity.current = account.id;
+    setUser(account.displayName); setUserEmail(account.email); setAccountId(account.id); setRole(account.role);
+    setProfileNameInput(account.displayName);
+    const saved = getStoredChats(account.id);
+    setChats(saved); setActiveChatId(saved[0]?.id || initialChat.id);
+    setFavorites(getStoredFavorites(account.id));
+    setView(account.role === 'admin' ? 'admin' : 'chat');
+    setRequestError('');
+  }
+
+  function clearAccount() {
+    identity.current = '';
+    pendingRequest.current?.abort(); pendingRequest.current = null; setPending(false);
+    setUser(''); setUserEmail(''); setAccountId(''); setRole(null);
+    setChats(getGuestChats()); setActiveChatId(initialChat.id); setFavorites([]);
+    setInput(''); setProfileNameInput(''); setUserMenuOpen(false); setPopularDesserts([]); setView('chat');
+  }
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.requestCounts, JSON.stringify(requestCounts));
-  }, [requestCounts]);
+    const controller = new AbortController();
+    api<Account>('/auth/me', { signal: controller.signal }).then(acceptAccount).catch(error => {
+      if (error instanceof ApiError && error.status !== 401) setRequestError(error.message);
+    }).finally(() => { if (!controller.signal.aborted) setAuthLoading(false); });
+    return () => { controller.abort(); pendingRequest.current?.abort(); };
+  }, []);
+
+  useEffect(() => {
+    if (!accountId) return;
+    const controller = new AbortController();
+    api<Recipe[]>('/recipes/popular', { signal: controller.signal }).then(setPopularDesserts).catch(() => {});
+    return () => controller.abort();
+  }, [accountId, pending]);
 
   useEffect(() => {
     const messages = messagesRef.current;
@@ -628,88 +584,35 @@ function App() {
   }, [activeChatId, chats, favorites]);
 
   useEffect(() => {
-    if (userEmail) {
-      localStorage.setItem(getScopedStorageKey(storageKeys.chats, userEmail), JSON.stringify(chats));
+    if (accountId) {
+      localStorage.setItem(getScopedStorageKey(storageKeys.chats, accountId), JSON.stringify(chats));
     }
-  }, [chats, userEmail]);
+  }, [chats, accountId]);
 
   useEffect(() => {
-    if (userEmail) {
-      localStorage.setItem(getScopedStorageKey(storageKeys.favorites, userEmail), JSON.stringify(favorites));
+    if (accountId) {
+      localStorage.setItem(getScopedStorageKey(storageKeys.favorites, accountId), JSON.stringify(favorites));
     }
-  }, [favorites, userEmail]);
+  }, [favorites, accountId]);
 
-  function handleAuthSubmit(event: FormEvent) {
+  async function handleAuthSubmit(event: FormEvent) {
     event.preventDefault();
+    if (authPending) return;
     setAuthError('');
-
-    if (!email.trim() || !password.trim()) {
-      setAuthError('Заполните электронную почту и пароль.');
-      return;
-    }
-
-    if (authMode === 'register' && password !== confirmPassword) {
-      setAuthError('Пароли не совпадают.');
-      return;
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    const passwordKey = getScopedStorageKey(storageKeys.password, normalizedEmail);
-    const savedPassword = localStorage.getItem(passwordKey);
-    const isAdminDemoAccount = normalizedEmail === adminDemoAccount.email;
-
-    if (isAdminDemoAccount && password !== (savedPassword || adminDemoAccount.password)) {
-      setAuthError('Для этого демо-аккаунта указан неверный пароль.');
-      return;
-    }
-
-    if (authMode === 'login' && savedPassword && savedPassword !== password) {
-      setAuthError('Неверный пароль. Проверьте данные и попробуйте снова.');
-      return;
-    }
-
-    if (authMode === 'register' && savedPassword) {
-      setAuthError('Аккаунт с такой почтой уже существует. Войдите или укажите другую почту.');
-      return;
-    }
-
-    const userChats = getStoredChats(normalizedEmail);
-    const userFavorites = getStoredFavorites(normalizedEmail);
-    const displayName = isAdminDemoAccount ? adminDemoAccount.displayName : getStoredDisplayName(normalizedEmail);
-    localStorage.setItem(storageKeys.user, displayName);
-    localStorage.setItem(storageKeys.email, normalizedEmail);
-
-    if (authMode === 'register' || !savedPassword) {
-      localStorage.setItem(passwordKey, password);
-    }
-
-    if (!localStorage.getItem(getScopedStorageKey(storageKeys.profileName, normalizedEmail))) {
-      localStorage.setItem(getScopedStorageKey(storageKeys.profileName, normalizedEmail), displayName);
-    }
-
-    setUser(displayName);
-    setUserEmail(normalizedEmail);
-    setProfileNameInput(displayName);
-    setChats(userChats);
-    setActiveChatId(userChats[0]?.id ?? initialChat.id);
-    setFavorites(userFavorites);
-    setPassword('');
-    setConfirmPassword('');
-    setView(isAdminDemoAccount ? 'admin' : 'chat');
+    if (!email.trim() || !password) { setAuthError('Заполните электронную почту и пароль.'); return; }
+    if (authMode === 'register' && password !== confirmPassword) { setAuthError('Пароли не совпадают.'); return; }
+    setAuthPending(true);
+    try {
+      const account = await api<Account>('/auth/' + authMode, { method: 'POST',
+        body: JSON.stringify({ email, password, confirmPassword }) });
+      acceptAccount(account); setPassword(''); setConfirmPassword('');
+    } catch (error) { setAuthError((error as Error).message); }
+    finally { setAuthPending(false); }
   }
 
-  function handleLogout() {
-    localStorage.removeItem(storageKeys.user);
-    localStorage.removeItem(storageKeys.email);
-    setUser('');
-    setUserEmail('');
-    setChats(getGuestChats());
-    setActiveChatId(initialChat.id);
-    setFavorites([]);
-    setInput('');
-    setProfileNameInput('');
-    setUserMenuOpen(false);
-    setView('chat');
+  async function handleLogout() {
+    try { await api('/auth/logout', { method: 'POST', body: '{}' }); clearAccount(); }
+    catch (error) { setRequestError((error as Error).message); }
   }
 
   function resetProfileForm(message = '') {
@@ -749,115 +652,65 @@ function App() {
     setView('chat');
   }
 
-  function handleNameChange(event: FormEvent) {
+  async function handleNameChange(event: FormEvent) {
     event.preventDefault();
-
-    const nextName = profileNameInput.trim().replace(/\s+/g, ' ');
-
-    if (!userEmail || !nextName) {
-      setProfileMessage('Введите имя, которое будет отображаться в профиле.');
-      return;
-    }
-
-    localStorage.setItem(storageKeys.user, nextName);
-    localStorage.setItem(getScopedStorageKey(storageKeys.profileName, userEmail), nextName);
-    setUser(nextName);
-    setProfileNameInput(nextName);
-    setProfileMessage('Имя профиля обновлено.');
+    try {
+      const account = await api<Account>('/profile', { method: 'PATCH', body: JSON.stringify({ displayName: profileNameInput }) });
+      setUser(account.displayName); setProfileNameInput(account.displayName); setProfileMessage('Имя профиля обновлено.');
+    } catch (error) { setProfileMessage((error as Error).message); }
   }
 
-  function handlePasswordChange(event: FormEvent) {
+  async function handlePasswordChange(event: FormEvent) {
     event.preventDefault();
-
-    if (!userEmail) {
-      return;
-    }
-
-    const passwordKey = getScopedStorageKey(storageKeys.password, userEmail);
-    const savedPassword = localStorage.getItem(passwordKey);
-
-    if (savedPassword && currentPassword !== savedPassword) {
-      setProfileMessage('Текущий пароль введен неверно.');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setProfileMessage('Новый пароль должен быть не короче 6 символов.');
-      return;
-    }
-
-    if (newPassword !== repeatNewPassword) {
-      setProfileMessage('Новый пароль и подтверждение не совпадают.');
-      return;
-    }
-
-    localStorage.setItem(passwordKey, newPassword);
-    resetProfileForm('Пароль обновлен.');
+    try {
+      await api('/profile/password', { method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword: repeatNewPassword }) });
+      resetProfileForm('Пароль обновлён. Остальные сессии завершены.');
+    } catch (error) { setProfileMessage((error as Error).message); }
   }
 
-  function handleDeleteAccount() {
-    if (!userEmail) {
-      return;
-    }
-
-    const shouldDelete = window.confirm('Удалить учетную запись SweetMate и все демо-данные этого пользователя?');
-
-    if (!shouldDelete) {
-      return;
-    }
-
-    localStorage.removeItem(getScopedStorageKey(storageKeys.chats, userEmail));
-    localStorage.removeItem(getScopedStorageKey(storageKeys.favorites, userEmail));
-    localStorage.removeItem(getScopedStorageKey(storageKeys.password, userEmail));
-    localStorage.removeItem(getScopedStorageKey(storageKeys.profileName, userEmail));
-    handleLogout();
+  async function handleDeleteAccount() {
+    if (!accountId || !window.confirm('Удалить учётную запись, её чаты и избранное?')) return;
+    try {
+      await api('/profile', { method: 'DELETE', body: '{}' });
+      localStorage.removeItem(getScopedStorageKey(storageKeys.chats, accountId));
+      localStorage.removeItem(getScopedStorageKey(storageKeys.favorites, accountId));
+      clearAccount();
+    } catch (error) { setProfileMessage((error as Error).message); }
   }
 
-  function submitQuestion(rawQuestion: string, allowGuestPreview = false) {
+  async function submitQuestion(rawQuestion: string) {
     const question = rawQuestion.trim();
-
-    if (!question || (isGuest && !allowGuestPreview)) {
-      return;
+    if (pendingRequest.current || isGuest) return;
+    setRequestError('');
+    if (!question) { setRequestError('Введите вопрос о десертах.'); return; }
+    if ([...rawQuestion].length > 500) { setRequestError('Вопрос не должен превышать 500 символов.'); return; }
+    const chatId = activeChat.id, owner = identity.current;
+    const controller = new AbortController(); pendingRequest.current = controller; setPending(true);
+    const userMessage: Message = { id: createId('user'), role: 'user', text: question };
+    setChats(current => current.map(chat => chat.id === chatId ? {
+      ...chat, title: chat.title === 'Новый чат' ? makeChatTitle(question) : chat.title,
+      messages: [...chat.messages, userMessage],
+    } : chat));
+    setView('chat'); setSidebarOpen(false);
+    try {
+      const result = await api<{ answer: string; recipes: Recipe[]; recipeDetail: Recipe | null; status: string; llmStatus: string; context: ChatContext; nutrition: NutritionReply | null }>(
+        '/search', { method: 'POST', body: JSON.stringify({
+          query: rawQuestion, context: chatContext(activeChat),
+          history: activeChat.messages.slice(-6).map(message => ({ role: message.role, text: message.text.slice(0, 400) })),
+        }), signal: controller.signal });
+      if (identity.current !== owner) return;
+      const answer: Message = { id: createId('assistant'), role: 'assistant', text: result.answer, context: result.context, nutrition: result.nutrition,
+        ...(result.recipeDetail ? { recipeDetail: result.recipeDetail } : { recipes: result.recipes }) };
+      setChats(current => current.map(chat => chat.id === chatId ? { ...chat, messages: [...chat.messages, answer] } : chat));
+      setInput(current => current === rawQuestion ? '' : current);
+    } catch (error) {
+      if (controller.signal.aborted || identity.current !== owner) return;
+      setRequestError((error as Error).message);
+      if (error instanceof ApiError && error.status === 401) clearAccount();
+    } finally {
+      if (pendingRequest.current === controller) { pendingRequest.current = null; setPending(false); }
     }
-
-    const requestedRecipe = findExactRecipe(question);
-    const nextRequestCounts = requestedRecipe
-      ? {
-          ...requestCounts,
-          [requestedRecipe.id]: (requestCounts[requestedRecipe.id] ?? requestedRecipe.requestCount) + 1,
-        }
-      : requestCounts;
-
-    if (requestedRecipe) {
-      setRequestCounts(nextRequestCounts);
-    }
-
-    const userMessage: Message = {
-      id: createId('user'),
-      role: 'user',
-      text: question,
-    };
-
-    setChats((current) =>
-      current.map((chat) => {
-        if (chat.id !== activeChat.id) {
-          return chat;
-        }
-
-        const answer = cloneResponse(question, chat.messages.length, nextRequestCounts);
-        const nextMessages = [...chat.messages, userMessage, answer];
-        const shouldRename = chat.title === 'Новый чат';
-
-        return {
-          ...chat,
-          title: shouldRename ? makeChatTitle(question) : chat.title,
-          messages: nextMessages,
-        };
-      }),
-    );
-    setInput('');
-    setView('chat');
-    setSidebarOpen(false);
   }
 
   function handleSend(event: FormEvent) {
@@ -865,16 +718,18 @@ function App() {
     submitQuestion(input);
   }
 
-  function getRecipeDetailMessage(recipe: Recipe): Message {
+  function getRecipeDetailMessage(recipe: Recipe, chat: Chat = activeChat): Message {
     return {
       id: createId('assistant'),
       role: 'assistant',
       text: `Вот полный рецепт: ${recipe.title}.`,
       recipeDetail: { ...recipe },
+      context: { ...chatContext(chat), selectedRecipeId: recipe.id },
     };
   }
 
   function openRecipeInChat(recipe: Recipe) {
+    if (isGuest) { setAuthMode('login'); setView('auth'); return; }
     const requestMessage: Message = {
       id: createId('user'),
       role: 'user',
@@ -896,6 +751,7 @@ function App() {
   }
 
   function openRecipeInNewChat(recipe: Recipe) {
+    if (isGuest) { setAuthMode('login'); setView('auth'); return; }
     const chatId = createId('chat');
     const chat: Chat = {
       id: chatId,
@@ -906,7 +762,7 @@ function App() {
           role: 'user',
           text: `Хочу рецепт ${recipe.title}`,
         },
-        getRecipeDetailMessage(recipe),
+        getRecipeDetailMessage(recipe, { id: chatId, title: recipe.title, messages: [] }),
       ],
     };
 
@@ -929,7 +785,7 @@ function App() {
 
         return {
           ...chat,
-          messages: [...chat.messages, getRecipeDetailMessage(favorite.recipe)],
+          messages: [...chat.messages, getRecipeDetailMessage(favorite.recipe, chat)],
         };
       }),
     );
@@ -996,7 +852,7 @@ function App() {
               <p>
                 {authMode === 'login'
                   ? 'Продолжайте свое кулинарное путешествие вместе с нами.'
-                  : 'Создайте демо-аккаунт и перейдите к чату с Dessert AI.'}
+                  : 'Создайте аккаунт и перейдите к подбору рецептов.'}
               </p>
             </div>
 
@@ -1031,19 +887,17 @@ function App() {
               />
             </label>
 
-            <p className={`form-error ${authError ? '' : 'is-hidden'}`}>{authError || 'Форма заполнена корректно.'}</p>
+            <p role="alert" className={`form-error ${authError ? '' : 'is-hidden'}`}>{authError || 'Форма заполнена корректно.'}</p>
 
             <div className="auth-card__row">
               <button type="button" className="text-button" onClick={() => setView('chat')}>
                 Вернуться к чату
               </button>
-              <button type="button" className="text-button">
-                Забыли пароль?
-              </button>
+
             </div>
 
-            <button className="primary-button" type="submit">
-              {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+            <button className="primary-button" type="submit" disabled={authPending}>
+              {authPending ? 'Подождите…' : authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
             </button>
           </form>
         </section>
@@ -1089,6 +943,7 @@ function App() {
                 </button>
                 {userMenuOpen && (
                   <div className="user-menu__popover">
+                    {role === 'admin' && <button type="button" onClick={() => { setView('admin'); setUserMenuOpen(false); }}>Обзор администратора</button>}
                     <button
                       type="button"
                       onClick={() => {
@@ -1109,6 +964,7 @@ function App() {
           </div>
         </header>
 
+        <div className="integration-notice">{requestError && <p className="integration-error" role="alert">{requestError}</p>}</div>
         <div className="workspace">
           <aside className={`sidebar ${view === 'admin' ? 'sidebar--admin' : ''} ${sidebarOpen ? 'is-open' : ''}`}>
             {view === 'admin' ? (
@@ -1212,6 +1068,7 @@ function App() {
 
             <section className="sidebar-section">
               <h2>Популярные десерты</h2>
+              {!popularDesserts.length && <p className="sidebar-note">Пока нет статистики поиска.</p>}
               <div className="popular-list">
                 {popularDesserts.map((dessert) => (
                   <button
@@ -1224,11 +1081,11 @@ function App() {
                     <div>
                       <strong>{dessert.title}</strong>
                       <span>{dessert.tag}</span>
-                      <small>{dessert.requestCount.toLocaleString('ru-RU')} запросов</small>
+                      <small>{dessert.requestCount.toLocaleString('ru-RU')} попаданий в выдачу</small>
                       <span className="popular-meter" aria-hidden="true">
                         <span
                           style={{
-                            width: `${Math.round((dessert.requestCount / popularDesserts[0].requestCount) * 100)}%`,
+                            width: `${Math.round((dessert.requestCount / Math.max(1, popularDesserts[0].requestCount)) * 100)}%`,
                           }}
                         />
                       </span>
@@ -1249,13 +1106,13 @@ function App() {
                   <div>
                     <p className="eyebrow">Профиль SweetMate</p>
                     <h1>{displayName}</h1>
-                    <p>{userEmail || 'Демо-пользователь SweetMate'}</p>
+                    <p>{userEmail}</p>
                   </div>
                 </div>
                 <dl>
                   <div>
                     <dt>Статус</dt>
-                    <dd>Демо-аккаунт</dd>
+                    <dd>{role === 'admin' ? 'Администратор' : 'Пользователь'}</dd>
                   </div>
                   <div>
                     <dt>Любимые рецепты</dt>
@@ -1314,12 +1171,12 @@ function App() {
                   </button>
                 </form>
 
-                {profileMessage && <p className="profile-message">{profileMessage}</p>}
+                {profileMessage && <p className="profile-message" role="status">{profileMessage}</p>}
 
                 <section className="danger-zone">
                   <div>
                     <h2>Удаление учетной записи</h2>
-                    <p>Удалит демо-чаты, избранное и сохраненный пароль текущего пользователя на этом устройстве.</p>
+                    <p>Удалит серверный аккаунт и его сессии, а также чаты и избранное в этом браузере.</p>
                   </div>
                   <button type="button" className="danger-button" onClick={handleDeleteAccount}>
                     Удалить учетную запись
@@ -1337,87 +1194,7 @@ function App() {
               </div>
             </section>
           ) : view === 'admin' ? (
-            <section className="admin-panel" aria-labelledby="admin-title">
-              <header className="admin-header">
-                <div>
-                  <p className="admin-eyebrow">Окно администратора</p>
-                  <h1 id="admin-title">Обзор</h1>
-                  <p>Состояние каталога и демонстрационных данных SweetMate.</p>
-                </div>
-                <span className="admin-demo-badge">Демо-окно</span>
-              </header>
-
-              <div className="admin-notice" role="note">
-                <strong>Только демонстрационные данные.</strong>
-                <span>Это окно открывается для специального демо-аккаунта. Серверной проверки прав и общей аналитики пока нет.</span>
-              </div>
-
-              <div className="admin-metrics" aria-label="Сводные показатели">
-                <article className="admin-metric">
-                  <span>Рецептов в каталоге</span>
-                  <strong>{recipeLibrary.length}</strong>
-                  <small>Локальный каталог</small>
-                </article>
-                <article className="admin-metric">
-                  <span>Популярность</span>
-                  <strong>В браузере</strong>
-                  <small>Демо-счётчики рецептов</small>
-                </article>
-                <article className="admin-metric">
-                  <span>Общие запросы</span>
-                  <strong>Нет данных</strong>
-                  <small>Серверная аналитика не подключена</small>
-                </article>
-                <article className="admin-metric">
-                  <span>Пользователи</span>
-                  <strong>Нет данных</strong>
-                  <small>Серверного учёта нет</small>
-                </article>
-              </div>
-
-              <div className="admin-content-grid">
-                <section className="admin-section" id="admin-recipes" aria-labelledby="admin-recipes-title">
-                  <div className="admin-section__heading">
-                    <div>
-                      <h2 id="admin-recipes-title">Популярные рецепты</h2>
-                      <p>Счётчики хранятся в текущем браузере и не являются общей статистикой.</p>
-                    </div>
-                    <span>{popularDesserts.length} из {recipeLibrary.length}</span>
-                  </div>
-                  <div className="admin-recipe-list">
-                    {popularDesserts.map((recipe, index) => (
-                      <div className="admin-recipe-row" key={recipe.id}>
-                        <span className="admin-recipe-rank">{String(index + 1).padStart(2, '0')}</span>
-                        <img src={recipe.image} alt="" />
-                        <div className="admin-recipe-info">
-                          <strong>{recipe.title}</strong>
-                          <span>{recipe.requestCount.toLocaleString('ru-RU')} демо-запросов</span>
-                          <span className="admin-meter" aria-hidden="true">
-                            <span style={{ width: `${Math.round((recipe.requestCount / popularDesserts[0].requestCount) * 100)}%` }} />
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="admin-section" id="admin-status" aria-labelledby="admin-status-title">
-                  <div className="admin-section__heading">
-                    <div>
-                      <h2 id="admin-status-title">Состояние сервисов</h2>
-                      <p>Что сейчас подключено в проекте.</p>
-                    </div>
-                  </div>
-                  <dl className="admin-status-list">
-                    <div><dt>Каталог рецептов</dt><dd className="is-local">Локально</dd></div>
-                    <div><dt>Поиск</dt><dd className="is-local">В браузере</dd></div>
-                    <div><dt>LLM и RAG</dt><dd>Не подключены</dd></div>
-                    <div><dt>Общая аналитика</dt><dd>Не подключена</dd></div>
-                  </dl>
-                  <p className="admin-privacy-note">Личные переписки, тексты запросов, email и избранное пользователей здесь не отображаются.</p>
-                </section>
-              </div>
-            </section>
+            <AdminPanel />
           ) : (
             <section className="chat-panel" aria-label="Чат с Dessert AI">
               <div className="chat-header">
@@ -1425,7 +1202,7 @@ function App() {
                   <h1>Чат с Dessert AI</h1>
                   <p>Задавайте вопросы о десертах, получайте рекомендации и вдохновляйтесь новыми идеями.</p>
                 </div>
-                <span className="chat-status">{isGuest ? 'Просмотр' : 'Демо-режим'}</span>
+                <span className="chat-status">{authLoading ? 'Проверяем вход…' : isGuest ? 'Просмотр примера' : 'Поиск по рецептам'}</span>
               </div>
 
               <div className="messages" aria-live="polite" ref={messagesRef}>
@@ -1433,7 +1210,11 @@ function App() {
                   <article className={`message message--${message.role}`} key={message.id}>
                     {message.role === 'assistant' && <span className="assistant-mark">S</span>}
                     <div className="message__bubble">
-                      <p>{message.text}</p>
+                      <p className="assistant-text">{message.text}</p>
+                      {message.nutrition && <NutritionTable data={message.nutrition} />}
+                      {!isGuest && activeChat.messages.length === 1 && message.role === 'assistant' && (
+                        <button type="button" className="text-button" onClick={() => setInput(exampleQuestion)}>Попробовать пример с бананом и молоком</button>
+                      )}
                       {message.recipes && (
                         <div className="recipe-list">
                           {message.recipes.map((recipe) => (
@@ -1445,17 +1226,25 @@ function App() {
                                   <button
                                     type="button"
                                     className={`heart-button ${favorites.includes(recipe.id) ? 'is-active' : ''}`}
-                                    aria-label="Добавить в избранное"
+                                    aria-label={favorites.includes(recipe.id) ? 'Убрать из избранного' : 'Добавить в избранное'}
                                     onClick={() => toggleFavorite(recipe.id)}
                                   >
                                     {favorites.includes(recipe.id) ? '♥' : '♡'}
                                   </button>
                                 </div>
-                                <p>{recipe.description}</p>
+                                <p className="recipe-summary">{recipe.description}</p>
+                                {Boolean(recipe.matchedIngredients?.length) && <p className="ingredient-match">Из вашего запроса: {recipe.matchedIngredients!.join(', ')}</p>}
+                                <ul className="card-ingredients" aria-label={'Ингредиенты: ' + recipe.title}>
+                                  {recipe.ingredients.slice(0, 6).map((ingredient, index) => <li key={index}>{ingredient}</li>)}
+                                </ul>
+                                {recipe.ingredients.length > 6 && <small>Полный состав — в рецепте.</small>}
+                                {Boolean(recipe.additionalIngredients?.length) && <p className="ingredient-extra">Дополнительно: {recipe.additionalIngredients!.slice(0, 6).join(', ')}{recipe.additionalIngredients!.length > 6 ? '…' : ''}</p>}
                                 <div className="recipe-meta">
                                   <span>{recipe.time}</span>
                                   <span>{recipe.difficulty}</span>
                                   <span>{recipe.tag}</span>
+                                  {recipe.servings != null && <span>Порций: {recipe.servings}</span>}
+                                  {recipe.nutrition?.per100g?.kcal != null && <span>{recipe.nutrition.per100g.kcal.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ккал / 100 г</span>}
                                 </div>
                                 <button type="button" className="select-recipe" onClick={() => openRecipeInChat(recipe)}>
                                   Открыть полный рецепт
@@ -1469,8 +1258,8 @@ function App() {
                     </div>
                   </article>
                 ))}
+                {pending && <p className="search-status" role="status">Подбираем рецепты и готовим объяснение…</p>}
               </div>
-
               {isGuest ? (
                 <div className="guest-composer">
                   <div>
@@ -1508,8 +1297,12 @@ function App() {
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
                     placeholder="Задайте вопрос о десертах..."
+                    maxLength={500}
+                    aria-describedby="question-length"
+                    aria-invalid={Boolean(requestError)}
                   />
-                  <button className="send-button" type="submit" aria-label="Отправить">
+                  <span id="question-length" className="question-length">{[...input].length}/500</span>
+                  <button className="send-button" type="submit" aria-label="Отправить" disabled={pending || authLoading}>
                     Отправить
                   </button>
                 </form>
