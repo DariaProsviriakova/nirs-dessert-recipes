@@ -56,6 +56,20 @@ export function scaleAmount(value,ratio) {
   if(a===null)return value;
   return match[1]+String(rounded(a*ratio)).replace('.',',')+(b!==null?'–'+String(rounded(b*ratio)).replace('.',','):'')+match[4];
 }
+const PLACEHOLDER_IMAGE = '/images/recipe-placeholder.svg';
+
+export function recipeImage(recipe) {
+  const candidate = String(recipe?.imageUrl ?? '').trim();
+  if (!candidate) return PLACEHOLDER_IMAGE;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'https:' || !['povarenok.ru', 'www.povarenok.ru'].includes(url.hostname.toLowerCase())) return PLACEHOLDER_IMAGE;
+    return url.href;
+  } catch {
+    return PLACEHOLDER_IMAGE;
+  }
+}
+
 export function presentRecipe(recipe,{ingredients=[],servings=null}={}) {
   if (!recipe) return null;
   const originalServings=recipe.servings || null;
@@ -69,7 +83,7 @@ export function presentRecipe(recipe,{ingredients=[],servings=null}={}) {
   const additionalIngredients=(recipe.ingredients || []).filter(i=>!ingredients.some(q=>ingredientMatches(q,i.name))).map(i=>i.name);
   const sourceUrl=/^https:\/\/(?:www\.)?povarenok\.ru\//i.test(recipe.sourceUrl || '')?recipe.sourceUrl:null;
   return {
-    id:recipe.id,title:recipe.title,description:recipe.description || '',image:'/images/recipe-placeholder.svg',
+    id:recipe.id,title:recipe.title,description:recipe.description || '',image:recipeImage(recipe),
     time:recipe.timeMinutes && !recipe.timeAnomaly?recipe.timeMinutes+' мин':'Время не указано',
     difficulty:'Сложность не указана',tag:recipe.categories?.at(-1) || 'Десерт',
     ingredients:ingredientEntries.map(i=>i.name+' — '+(i.amount || 'количество не указано')),ingredientEntries,

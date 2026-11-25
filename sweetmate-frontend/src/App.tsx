@@ -448,6 +448,23 @@ function Logo() {
   );
 }
 
+function RecipeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={(event) => {
+        const image = event.currentTarget;
+        image.onerror = null;
+        image.src = '/images/recipe-placeholder.svg';
+      }}
+    />
+  );
+}
+
 function chatContext(chat: Chat): ChatContext {
   const saved = [...chat.messages].reverse().find(message => message.context)?.context;
   const lastRecipes = [...chat.messages].reverse().find(message => message.recipes?.length || message.recipeDetail);
@@ -496,6 +513,7 @@ function RecipeDetail({ recipe }: { recipe: Recipe }) {
         </div>
         <span>{recipe.sourceUrl ? 'Данные источника' : 'Демонстрационный пример'}</span>
       </div>
+      <RecipeImage src={recipe.image} alt={recipe.title} className="recipe-detail__image" />
       <p>{recipe.description}</p>
       {recipe.sourceUrl && <p><a href={recipe.sourceUrl} target="_blank" rel="noreferrer">Источник: Поварёнок</a> · Рецепт не проходил ручную проверку.</p>}
       {recipe.servings != null && <p>Порций: {recipe.servings}{recipe.scaled ? ' · ингредиенты пересчитаны с ' + recipe.originalServings + ' порций' : ''}</p>}
@@ -1137,7 +1155,7 @@ function App() {
                         type="button"
                         onClick={() => openFavoriteRecipe(favorite)}
                       >
-                        <img src={favorite.recipe.image} alt="" />
+                        <RecipeImage src={favorite.recipe.image} alt="" />
                         <div>
                           <strong>{favorite.recipe.title}</strong>
                           <span>{favorite.recipe.time} · {favorite.recipe.tag}</span>
@@ -1171,7 +1189,7 @@ function App() {
                     type="button"
                     onClick={() => openRecipeInNewChat(dessert)}
                   >
-                    <img src={dessert.image} alt="" />
+                    <RecipeImage src={dessert.image} alt="" />
                     <div>
                       <strong>{dessert.title}</strong>
                       <span>{dessert.tag}</span>
@@ -1313,7 +1331,7 @@ function App() {
                         <div className="recipe-list">
                           {message.recipes.map((recipe) => (
                             <article className="recipe-card" key={recipe.id}>
-                              <img src={recipe.image} alt={recipe.title} />
+                              <RecipeImage src={recipe.image} alt={recipe.title} />
                               <div className="recipe-card__content">
                                 <div className="recipe-card__top">
                                   <h2>{recipe.title}</h2>

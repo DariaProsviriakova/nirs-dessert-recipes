@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | [`sweetmate-frontend/src/App.tsx`](../../sweetmate-frontend/src/App.tsx) | Типы рецепта, семь демонстрационных записей, запросы, локальный скоринг и подготовленные тексты ответов | 2026-10-16 | Источник текущего поведения; сами рецепты и их происхождение отдельно не подтверждены |
 | [`sweetmate-frontend/public/images/`](../../sweetmate-frontend/public/images/) | Локальные изображения карточек и заставки | 2026-10-16 | Права и лицензии на изображения не подтверждены; см. GAP-06 |
+| [Povarenok recipes detail](https://huggingface.co/datasets/d0rj/povarenok_recipes_detail) | Рецепты и URL основного изображения main_image_url | 2026-11-26 | Фото загружается напрямую с Povarenok и не копируется в репозиторий; права на публикацию не подтверждены, см. GAP-06 |
 | [`sweetmate-frontend/package.json`](../../sweetmate-frontend/package.json) | Команды запуска, сборки и используемые зависимости | 2026-10-16 | Указаны только зависимости текущего frontend |
 
 ## Требования

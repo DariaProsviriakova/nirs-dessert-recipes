@@ -3,13 +3,13 @@ import { gunzipSync } from 'node:zlib';
 import { buildBm25Index, searchRecipes } from '../bm25/src/bm25.mjs';
 import { parseQuery } from '../bm25/src/query.mjs';
 import { dessertIndex } from './catalog.mjs';
-import { ingredientMatches, ingredientExcluded, macroValues, presentRecipe } from './recipe-data.mjs';
+import { ingredientMatches, ingredientExcluded, macroValues, presentRecipe, recipeImage } from './recipe-data.mjs';
 import { phraseKey, tokenize } from '../bm25/src/text.mjs';
 
 export function toRecipe(r, requestCount=0) {
   if (!r) return null;
   return {
-    id:r.id, title:r.title, description:r.description || '', image:'/images/recipe-placeholder.svg',
+    id:r.id, title:r.title, description:r.description || '', image:recipeImage(r),
     time:r.timeMinutes && !r.timeAnomaly ? r.timeMinutes+' мин' : 'Время не указано',
     difficulty:'Сложность не указана', tag:r.categories?.at(-1) || 'Десерт',
     ingredients:(r.ingredients || []).map(i=>[i.name,i.amount].filter(Boolean).join(' — ')),

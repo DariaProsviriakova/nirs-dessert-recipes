@@ -883,6 +883,15 @@ h3 {
   object-fit: cover;
 }
 
+.recipe-detail__image {
+  display: block;
+  width: min(100%, 520px);
+  max-height: 340px;
+  margin: 14px auto 20px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
 .recipe-card__content {
   min-width: 0;
 }

@@ -191,7 +191,7 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
       res.writeHead(200,{'Content-Type':MIME[path.extname(file)] || 'application/octet-stream',
         'Cache-Control':path.extname(file)==='.html' ? 'no-cache' : 'public, max-age=3600',
         'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',
-        'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
+        'Content-Security-Policy':"default-src 'self'; img-src 'self' data: https://povarenok.ru https://www.povarenok.ru; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
       res.end(method==='HEAD' ? undefined : data);
     } catch(error) {
       if (!res.headersSent) send(res,error instanceof ApiError ? error.status : 500,
