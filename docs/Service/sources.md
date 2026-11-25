@@ -18,10 +18,3 @@
 
 - Структура `Service` и документа `verification.md` сверена с [примером Minecraft Mod Picker](https://github.com/rowapepe/minecraft-mod-picker/blob/main/docs/Service/verification.md). Содержимое примера не переносилось; таблицы и статусы заполнены данными SweetMate.
 - Схема `Tech` сверена с [индексом технической документации примера](https://github.com/rowapepe/minecraft-mod-picker/tree/main/docs/Tech).
-
-## Локальная интеграция 2026-11-25
-
-- Корпус и поиск: [bm25/README.md](../../bm25/README.md); исходный dataset d0rj/povarenok_recipes_detail, ссылки на рецепты Поварёнок.
-- GigaChat: [получение токена](https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/post-token), [генерация](https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/post-chat).
-- Node.js: [SQLite](https://nodejs.org/docs/latest-v24.x/api/sqlite.html), [crypto/scrypt](https://nodejs.org/docs/latest-v24.x/api/crypto.html).
-- Старые фото используются только гостевым примером; права на них не подтверждены. Для новых карточек создана собственная SVG-заглушка.
