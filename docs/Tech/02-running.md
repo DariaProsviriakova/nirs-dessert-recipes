@@ -1,29 +1,40 @@
-# Запуск и сборка
+# Установка и запуск
 
-## Предварительные требования
+Требуется Node.js 24 или новее, npm и интернет для первого скачивания корпуса.
 
-- Node.js, совместимый с версией Vite в `package-lock.json`.
-- npm.
+## Первичная подготовка
 
-## Установка и запуск
+В корне репозитория выполни:
 
-```bash
-cd sweetmate-frontend
-npm install
-npm run dev
-```
+    npm ci
+    npm run prepare:data
 
-Vite выводит локальный адрес в терминал. Скрипт разработки запускает `vite --host 0.0.0.0`.
+Команда скачивает Parquet с Hugging Face, формирует корпус и индекс в bm25/data. Эти локальные данные исключены из Git. .env не нужен для BM25-поиска; для GigaChat скопируй .env.example в .env и задай LLM_PROVIDER и свой LLM_API_KEY.
 
-## Проверка production-сборки
+## Разработка
 
-```bash
-cd sweetmate-frontend
-npx tsc --noEmit
-npm run build
-npm run preview
-```
+Открой два терминала в корне репозитория. В первом запусти backend:
 
-`npm run build` сначала выполняет `tsc --noEmit`, затем собирает frontend посредством Vite в `dist/`. `npm run preview` запускает локальный просмотр собранной версии.
+    npm run dev
 
-Переменные окружения и backend-сервисы frontend для запуска не требует. Наличие корневого `docker-compose.yml` не означает, что этим прототипом предоставляется API.
+Во втором запусти Vite:
+
+    npm --prefix sweetmate-frontend ci
+    npm --prefix sweetmate-frontend run dev
+
+Открой адрес Vite, обычно http://localhost:5173. Vite проксирует /api на http://127.0.0.1:8000.
+
+## Собранный запуск
+
+    npm run build
+    npm start
+
+Сборка создаётся в sweetmate-frontend/dist; сервер доступен на http://localhost:8000. Индекс BM25 должен быть подготовлен заранее.
+
+## Команды проверок
+
+    npm test
+    npm run test:e2e
+    npm run build
+
+Смотри [протокол](../Service/verification.md), чтобы узнать, запускались ли они фактически.

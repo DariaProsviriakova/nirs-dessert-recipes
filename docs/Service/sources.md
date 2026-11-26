@@ -1,20 +1,14 @@
 # Источники
 
-## Данные
-
-| Источник | Что взято | Дата | Примечание |
+| Источник | Что подтверждает | Сверено | Примечание |
 | --- | --- | --- | --- |
-| [`sweetmate-frontend/src/App.tsx`](../../sweetmate-frontend/src/App.tsx) | Типы рецепта, семь демонстрационных записей, запросы, локальный скоринг и подготовленные тексты ответов | 2026-10-16 | Источник текущего поведения; сами рецепты и их происхождение отдельно не подтверждены |
-| [`sweetmate-frontend/public/images/`](../../sweetmate-frontend/public/images/) | Локальные изображения карточек и заставки | 2026-10-16 | Права и лицензии на изображения не подтверждены; см. GAP-06 |
-| [`sweetmate-frontend/package.json`](../../sweetmate-frontend/package.json) | Команды запуска, сборки и используемые зависимости | 2026-10-16 | Указаны только зависимости текущего frontend |
+| [Povarenok recipes detail](https://huggingface.co/datasets/d0rj/povarenok_recipes_detail) | Исходные Parquet корпуса | 2026-11-26 | Автоматический отбор не равен ручной проверке рецептов |
+| bm25/scripts/ и bm25/src/ | Загрузка, нормализация, индекс, запросы и benchmark | 2026-11-26 | Ручная разметка — bm25/data/manual-benchmark-queries.json |
+| backend/ | API, SQLite, авторизация, события, BM25 и LLM | 2026-11-26 | Источник текущего серверного поведения |
+| sweetmate-frontend/src/ | Интерфейс, API-клиент, чаты и избранное | 2026-11-26 | Чаты и избранное остаются в браузере |
+| sweetmate-frontend/public/images/ | Статические изображения и заглушка | 2026-11-26 | Фото рецептов загружаются по URL; права требуют проверки |
+| package.json и lock-файлы | Скрипты и версии зависимостей | 2026-11-26 | BM25 имеет отдельный package-lock.json |
 
-## Требования
+Product-страницы отражают исходную постановку со статусами на 2026-10-15. Текущее состояние кода смотри в [STATUS.md](../../STATUS.md) и [Tech](../Tech/README.md).
 
-- [Product — контекст](../Product/01-context.md), сценарии, требования, интерфейс и правила фиксируют продуктовые ожидания и ограничения прототипа.
-- [README проекта](../../README.md) содержит назначение, стек, команды запуска и зоны ответственности команды.
-- [AGENTS.md](../../AGENTS.md) задаёт ограничения и правила работы с документацией.
-
-## Оформление
-
-- Структура `Service` и документа `verification.md` сверена с [примером Minecraft Mod Picker](https://github.com/rowapepe/minecraft-mod-picker/blob/main/docs/Service/verification.md). Содержимое примера не переносилось; таблицы и статусы заполнены данными SweetMate.
-- Схема `Tech` сверена с [индексом технической документации примера](https://github.com/rowapepe/minecraft-mod-picker/tree/main/docs/Tech).
+Структура разделов сверялась с [примером Service verification](https://github.com/rowapepe/minecraft-mod-picker/blob/main/docs/Service/verification.md) и [примером Tech](https://github.com/rowapepe/minecraft-mod-picker/tree/main/docs/Tech); содержимое проекта Minecraft не переносилось.

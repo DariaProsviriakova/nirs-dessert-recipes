@@ -2,19 +2,18 @@
 
 | Путь | Назначение |
 | --- | --- |
-| `README.md` | Назначение проекта, участницы команды, структура и запуск |
-| `AGENTS.md` | Правила работы и ограничения проекта |
-| `STATUS.md` | Проверенное текущее состояние frontend-прототипа |
-| `CHANGE_HISTORY.md` | История изменений документации и проекта |
-| `docs/Product/` | Контекст, сценарии, требования, интерфейс и правила продукта |
-| `docs/Service/` | Принятые решения, открытые вопросы, источники и протокол проверок |
-| `docs/Tech/` | Архитектура, запуск, данные, доступ, проверки и эта карта |
-| `sweetmate-frontend/index.html` | HTML entry point; напрямую подключает `/src/App.tsx` |
-| `sweetmate-frontend/src/App.tsx` | React-приложение, локальный каталог, поиск и состояния экранов |
-| `sweetmate-frontend/src/styles.css` | Стили, адаптивная компоновка и состояния UI |
-| `sweetmate-frontend/public/images/` | Локальные изображения прототипа |
-| `sweetmate-frontend/package.json` | Зависимости и скрипты npm |
-| `sweetmate-frontend/vite.config.ts` | Конфигурация Vite и React-плагина |
-| `docker-compose.yml` | Корневая Compose-конфигурация; не является описанием доступного frontend API |
+| README.md, STATUS.md | Описание проекта и текущий статус |
+| AGENTS.md, CHANGE_HISTORY.md | Правила работы и история |
+| .env.example, package.json | Пример настройки и корневые команды |
+| backend/ | HTTP API, авторизация, SQLite, диалог и LLM |
+| backend/tests/ | Backend- и браузерные сценарии |
+| bm25/src/ | Токенизация, запросы и ранжирование |
+| bm25/scripts/ | Загрузка данных, индекс и benchmark |
+| bm25/data/ | Ручная разметка и локальные генерируемые данные |
+| sweetmate-frontend/src/ | React, API-клиент и административная панель |
+| sweetmate-frontend/public/images/ | Статические изображения и заглушка |
+| docs/Product/ | Продуктовая постановка |
+| docs/Service/ | Решения, источники и проверки |
+| docs/Tech/ | Техническая документация |
 
-Запуск frontend выполняется из `sweetmate-frontend/`; команды приведены в [02-running.md](02-running.md).
+Корпус и индекс строятся командой npm run prepare:data и в Git не входят. См. [02-running.md](02-running.md) и [03-data.md](03-data.md).

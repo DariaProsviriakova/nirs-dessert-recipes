@@ -1,77 +1,54 @@
-# NIRS: рецепты десертов
+# NIRS Dessert Recipes
 
-NIRS Dessert Recipes — учебный проект сайта SweetMate с чатом для подбора и просмотра рецептов. Сейчас в репозитории находится frontend-прототип; его текущее состояние и ограничения записаны в [STATUS.md](STATUS.md).
+NIRS Dessert Recipes — учебный проект сайта SweetMate для подбора и просмотра десертов. В репозитории есть React-интерфейс, Node.js API, SQLite-хранилище аккаунтов и событий поиска, BM25-поиск по корпусу Povarenok и необязательная интеграция с GigaChat.
 
 ## Команда
 
 | Участник | Зона ответственности |
 | --- | --- |
-| Просвирякова Дарья | Продукт и интерфейс: задача, сценарии, документация Product, макет и внешний вид |
-| Якубова Динара | Интеграция: связь интерфейса, поиска и вызова LLM |
-| Маргорина Ирина | RAG: корпус, индекс BM25, поиск и benchmark |
+| Просвирякова Дарья | Продукт, сценарии и интерфейс |
+| Якубова Динара | Backend, API и интеграция с LLM |
+| Маргорина Ирина | Корпус данных, BM25 и benchmark |
 
-Роли описывают распределение работы. Интеграция и RAG в прототип пока не включены.
+## Структура
 
-## Структура проекта
-
-```text
-nirs-dessert-recipes/
-|-- README.md
-|-- AGENTS.md
-|-- STATUS.md
-|-- CHANGE_HISTORY.md
-|-- docs/
-|   |-- README.md
-|   |-- Product/
-|   |   |-- README.md
-|   |   |-- 01-context.md
-|   |   |-- 02-users-and-scenarios.md
-|   |   |-- 03-requirements.md
-|   |   |-- 04-interface-and-behavior.md
-|   |   `-- 05-rules-and-data-meaning.md
-|   |-- Service/
-|   |   |-- README.md
-|   |   |-- decisions.md
-|   |   |-- sources.md
-|   |   `-- verification.md
-|   `-- Tech/
-|       |-- README.md
-|       |-- 01-architecture.md
-|       |-- 02-running.md
-|       |-- 03-data.md
-|       |-- 04-api-and-access.md
-|       |-- 05-verification.md
-|       `-- WORKSPACE_MAP.md
-`-- sweetmate-frontend/
-    |-- index.html
-    |-- package.json
-    |-- package-lock.json
-    |-- vite.config.ts
-    |-- tsconfig.json
-    |-- public/images/
-    `-- src/
-        |-- App.tsx
-        `-- styles.css
-```
+- backend/ — API, авторизация, SQLite, диалог и LLM.
+- bm25/ — загрузка датасета, корпус, индекс, поиск и benchmark.
+- sweetmate-frontend/ — React и Vite.
+- docs/Product/, docs/Tech/, docs/Service/ — продуктовая, техническая и сервисная документация.
 
 ## Запуск
 
-Нужны Node.js и npm.
+Нужен Node.js 24 или новее и npm. В корне репозитория:
 
-```bash
-cd sweetmate-frontend
-npm install
-npm run dev
-```
+    npm ci
+    npm run prepare:data
 
-Сборка для проверки: `npm run build` из каталога `sweetmate-frontend`.
+Команда prepare:data скачивает исходные Parquet-файлы с Hugging Face, собирает корпус и индекс. Эти данные не хранятся в Git; каждому новому клону нужно подготовить их локально.
 
-## Документы
+Для разработки открой два терминала в корне репозитория. В первом запусти backend:
 
-- [Product-документация](docs/Product/README.md) — назначение раздела и ссылки на отдельные документы.
-- [Service-документация](docs/Service/README.md) — решения, открытые вопросы, источники и протокол проверок.
-- [Tech-документация](docs/Tech/README.md) — архитектура, запуск, данные, доступ и карта репозитория.
-- [Карта документации](docs/README.md) — вход в разделы Product, Service и Tech.
-- [Статус проекта](STATUS.md) — что реализовано и какие ограничения проверены.
-- [Правила работы](AGENTS.md) — порядок изменения кода и документации.
-- [История изменений](CHANGE_HISTORY.md) — записи по датам.
+    npm run dev
+
+Во втором запусти интерфейс Vite:
+
+    npm --prefix sweetmate-frontend ci
+    npm --prefix sweetmate-frontend run dev
+
+Открой адрес Vite, обычно http://localhost:5173. Запросы /api проксируются на backend на порту 8000. Для собранной версии выполни npm run build, затем npm start; сервер отдаёт её на http://localhost:8000.
+
+Файл .env необязателен для поиска. Чтобы настроить администратора или GigaChat, создай его по примеру .env.example и внеси свои значения. Не добавляй .env или ключи в Git.
+
+## Данные и поиск
+
+Источник — [Povarenok recipes detail](https://huggingface.co/datasets/d0rj/povarenok_recipes_detail). BM25 работает без ключа LLM. GigaChat включается отдельно; без него доступны поиск и структурированные ответы. Фото загружаются по URL источника, если он есть; иначе отображается заглушка.
+
+## Документы и проверки
+
+- [Карта документации](docs/README.md)
+- [Текущий статус](STATUS.md)
+- [Product](docs/Product/README.md), [Tech](docs/Tech/README.md), [Service](docs/Service/README.md)
+- [BM25 и benchmark](bm25/README.md)
+- [История изменений](CHANGE_HISTORY.md)
+
+Корневые команды проверок: npm test, npm run test:e2e и npm run build. Команда в package.json не означает, что проверка уже выполнялась; результаты записываются в docs/Service/verification.md.
