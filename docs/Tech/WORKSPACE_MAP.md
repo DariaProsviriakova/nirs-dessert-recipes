@@ -14,6 +14,6 @@
 | sweetmate-frontend/public/images/ | Статические изображения и заглушка |
 | docs/Product/ | Продуктовая постановка |
 | docs/Service/ | Решения, источники и проверки |
-| docs/Tech/ | Техническая документация |
+| docs/Tech/ | Техническая документация, включая руководство BM25 |
 
 Корпус и индекс строятся командой npm run prepare:data и в Git не входят. См. [02-running.md](02-running.md) и [03-data.md](03-data.md).

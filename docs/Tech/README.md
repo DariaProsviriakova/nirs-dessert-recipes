@@ -9,6 +9,7 @@
 | [03-data.md](03-data.md) | Датасет, индекс и хранилища |
 | [04-api-and-access.md](04-api-and-access.md) | Маршруты, сессии и роли |
 | [05-verification.md](05-verification.md) | Команды проверок и их границы |
+| [06-bm25-and-benchmark.md](06-bm25-and-benchmark.md) | Корпус, поиск и benchmark |
 | [WORKSPACE_MAP.md](WORKSPACE_MAP.md) | Карта репозитория |
 
 Состояние исходников сверено 2026-11-26. Проверки запуска отражены отдельно в [Service](../Service/verification.md).
