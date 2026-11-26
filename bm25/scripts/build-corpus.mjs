@@ -28,7 +28,7 @@ const sweetFillingPattern = /яблок|яблоч|груш|слив|вишн|я
 const excludedCategoryPattern = /несладк|закусочн/iu;
 const MAX_REASONABLE_SERVINGS = 1000;
 const columns = [
-  'title', 'page_url', 'description', 'kroshki', 'ingredients', 'cooking_time',
+  'title', 'page_url', 'main_image_url', 'description', 'kroshki', 'ingredients', 'cooking_time',
   'portions_count', 'cooking_steps', 'purposes', 'tags', 'tastes', 'nae_value',
 ];
 
@@ -38,6 +38,18 @@ function list(value) {
 
 function text(value) {
   return String(value ?? '').trim();
+}
+
+function sourceImageUrl(value) {
+  const candidate = text(value);
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'https:' || !['povarenok.ru', 'www.povarenok.ru'].includes(url.hostname.toLowerCase())) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function chooseDessertCategory(row) {
@@ -82,6 +94,7 @@ function normalizeRecipe(row, selectionReason) {
   return {
     id,
     sourceUrl,
+    imageUrl: sourceImageUrl(row.main_image_url),
     title,
     description: text(row.description),
     categories,
@@ -146,6 +159,7 @@ const fieldCoverage = {
   timePresent: recipes.filter((recipe) => recipe.timeMinutes !== null).length,
   timeOutliersOver24h: recipes.filter((recipe) => recipe.timeAnomaly).length,
   servingsPresent: recipes.filter((recipe) => recipe.servings !== null).length,
+  imagePresent: recipes.filter((recipe) => recipe.imageUrl !== null).length,
   servingsUnusable: recipes.filter((recipe) => recipe.servingsAnomaly).length,
   nutritionPer100gPresent: recipes.filter((recipe) => recipe.nutrition.per100g).length,
   nutritionWholeDishPresent: recipes.filter((recipe) => recipe.nutrition.wholeDish).length,
