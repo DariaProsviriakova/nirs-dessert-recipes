@@ -33,7 +33,7 @@ test('validation, CSRF, role isolation and request counting including empty resu
   assert.equal(found.status,200); assert(found.data.recipes.length>0 && found.data.recipes.length<=3);
   assert.equal(found.data.llmStatus,'not_configured'); assert(!JSON.stringify(found.data).includes('"score"'));
   const empty=await request('/search','POST',{query:'ксдфжщы'},user.cookie);
-  assert.equal(empty.data.status,'empty'); assert.deepEqual(empty.data.recipes,[]);
+  assert.equal(empty.data.status,'empty'); assert.equal(empty.data.answer,''); assert.deepEqual(empty.data.recipes,[]);
   const clarification=await request('/search','POST',{query:'до 200 ккал'},user.cookie);
   assert.equal(clarification.data.status,'clarification');
   await request('/recipes/banana','GET',undefined,user.cookie);
@@ -99,7 +99,7 @@ test('authentication rate limited',()=>withApp(async({request})=>{
 test('strict ingredient matching returns empty without counting unrelated recipe IDs',()=>withApp(async({request,register,db})=>{
   const user=await register();
   const result=await request('/search','POST',{query:'у меня есть банан и молоко'},user.cookie);
-  assert.equal(result.status,200);assert.equal(result.data.status,'empty');assert.deepEqual(result.data.recipes,[]);
+  assert.equal(result.status,200);assert.equal(result.data.status,'empty');assert.equal(result.data.answer,'');assert.deepEqual(result.data.recipes,[]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM result_recipes').get().n,0);
   assert.equal(db.prepare('SELECT status FROM events').get().status,'empty');
 }));

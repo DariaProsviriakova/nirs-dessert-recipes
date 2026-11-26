@@ -44,12 +44,14 @@ type Message = {
   recipeDetail?: Recipe;
   context?: ChatContext;
   nutrition?: NutritionReply | null;
+  llmStatus?: string;
 };
 
 type Chat = {
   id: string;
   title: string;
   messages: Message[];
+  context?: ChatContext;
 };
 
 type AuthMode = 'login' | 'register';
@@ -466,7 +468,7 @@ function RecipeImage({ src, alt, className }: { src: string; alt: string; classN
 }
 
 function chatContext(chat: Chat): ChatContext {
-  const saved = [...chat.messages].reverse().find(message => message.context)?.context;
+  const saved = chat.context ?? [...chat.messages].reverse().find(message => message.context)?.context;
   const lastRecipes = [...chat.messages].reverse().find(message => message.recipes?.length || message.recipeDetail);
   const fallback: ChatContext = {
     version: 3, ingredients: [], excludedIngredients: [], topic: '',
@@ -474,7 +476,7 @@ function chatContext(chat: Chat): ChatContext {
     selectedRecipeId: lastRecipes?.recipeDetail?.id ?? null, servings: lastRecipes?.recipeDetail?.servings ?? null,
     filters: {}, sort: 'relevance',
   };
-  const memoryContext = [...chat.messages].reverse().find(message => message.context?.recipeGroups)?.context;
+  const memoryContext = chat.context?.recipeGroups ? chat.context : [...chat.messages].reverse().find(message => message.context?.recipeGroups)?.context;
   const groups = memoryContext?.recipeGroups?.map(group => [...group]) ?? [];
   const ids = new Set<string>(saved?.knownRecipeIds ?? []);
   for (const message of chat.messages) {
@@ -564,6 +566,8 @@ function App() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [duplicateEmail, setDuplicateEmail] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [chats, setChats] = useState<Chat[]>(getGuestChats);
   const [activeChatId, setActiveChatId] = useState(initialChat.id);
   const [input, setInput] = useState('');
@@ -644,7 +648,7 @@ function App() {
     wasViewingChatRef.current = true;
 
     if (previousState.messageCount < activeChat.messages.length) {
-      messages.scrollTo({ top: messages.scrollHeight, behavior: 'smooth' });
+      messages.scrollTo({ top: messages.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
   }, [activeChat.id, activeChat.messages.length, view]);
 
@@ -680,13 +684,15 @@ function App() {
 
   useEffect(() => {
     if (accountId) {
-      localStorage.setItem(getScopedStorageKey(storageKeys.chats, accountId), JSON.stringify(chats));
+      try { localStorage.setItem(getScopedStorageKey(storageKeys.chats, accountId), JSON.stringify(chats)); }
+      catch { setRequestError('Не удалось сохранить историю в этом браузере. Проверьте доступное место и настройки хранения данных.'); }
     }
   }, [chats, accountId]);
 
   useEffect(() => {
     if (accountId) {
-      localStorage.setItem(getScopedStorageKey(storageKeys.favorites, accountId), JSON.stringify(favorites));
+      try { localStorage.setItem(getScopedStorageKey(storageKeys.favorites, accountId), JSON.stringify(favorites)); }
+      catch { setRequestError('Не удалось сохранить избранное в этом браузере. Проверьте настройки хранения данных.'); }
     }
   }, [favorites, accountId]);
 
@@ -705,15 +711,19 @@ function App() {
   async function handleAuthSubmit(event: FormEvent) {
     event.preventDefault();
     if (authPending) return;
-    setAuthError('');
-    if (!email.trim() || !password) { setAuthError('Заполните электронную почту и пароль.'); return; }
+    setAuthError(''); setDuplicateEmail(false);
+    if (!email.trim()) { setAuthError('Укажите электронную почту.'); emailInputRef.current?.focus(); return; }
+    if (!password) { setAuthError('Укажите пароль.'); return; }
     if (authMode === 'register' && password !== confirmPassword) { setAuthError('Пароли не совпадают.'); return; }
     setAuthPending(true);
     try {
       const account = await api<Account>('/auth/' + authMode, { method: 'POST',
         body: JSON.stringify({ email, password, confirmPassword }) });
       acceptAccount(account); setPassword(''); setConfirmPassword('');
-    } catch (error) { setAuthError((error as Error).message); }
+    } catch (error) {
+      setAuthError((error as Error).message);
+      setDuplicateEmail(error instanceof ApiError && error.status === 409);
+    }
     finally { setAuthPending(false); }
   }
 
@@ -807,9 +817,12 @@ function App() {
           history: activeChat.messages.slice(-6).map(message => ({ role: message.role, text: message.text.slice(0, 400) })),
         }), signal: controller.signal });
       if (identity.current !== owner) return;
-      const answer: Message = { id: createId('assistant'), role: 'assistant', text: result.answer, context: result.context, nutrition: result.nutrition,
+      const answer: Message = { id: createId('assistant'), role: 'assistant', text: result.answer, context: result.context, nutrition: result.nutrition, llmStatus: result.llmStatus,
         ...(result.recipeDetail ? { recipeDetail: result.recipeDetail } : { recipes: result.recipes }) };
-      setChats(current => current.map(chat => chat.id === chatId ? { ...chat, messages: [...chat.messages, answer] } : chat));
+      setChats(current => current.map(chat => chat.id === chatId ? {
+        ...chat, context: result.context,
+        messages: result.status === 'empty' ? chat.messages : [...chat.messages, answer],
+      } : chat));
       setInput(current => current === rawQuestion ? '' : current);
     } catch (error) {
       if (controller.signal.aborted || identity.current !== owner) return;
@@ -851,7 +864,8 @@ function App() {
 
         return {
           ...chat,
-          messages: [...chat.messages, requestMessage, getRecipeDetailMessage(recipe)],
+          context: { ...chatContext(chat), selectedRecipeId: recipe.id },
+          messages: [...chat.messages, requestMessage, getRecipeDetailMessage(recipe, chat)],
         };
       }),
     );
@@ -886,12 +900,11 @@ function App() {
 
     setChats((current) =>
       current.map((chat) => {
-        if (chat.id !== favorite.chatId || chat.messages.some((message) => message.recipeDetail?.id === favorite.recipe.id)) {
-          return chat;
-        }
-
+        if (chat.id !== favorite.chatId) return chat;
+        const context = { ...chatContext(chat), selectedRecipeId: favorite.recipe.id };
+        if (chat.messages.some((message) => message.recipeDetail?.id === favorite.recipe.id)) return { ...chat, context };
         return {
-          ...chat,
+          ...chat, context,
           messages: [...chat.messages, getRecipeDetailMessage(favorite.recipe, chat)],
         };
       }),
@@ -967,9 +980,11 @@ function App() {
               <span>Электронная почта</span>
               <input
                 type="email"
+                ref={emailInputRef}
+                autoComplete="email"
                 placeholder="example@mail.ru"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => { setEmail(event.target.value); setDuplicateEmail(false); }}
               />
             </label>
 
@@ -995,6 +1010,15 @@ function App() {
             </label>
 
             <p role="alert" className={`form-error ${authError ? '' : 'is-hidden'}`}>{authError || 'Форма заполнена корректно.'}</p>
+
+            {authMode === 'register' && duplicateEmail && <div className="auth-card__row">
+              <button type="button" className="text-button" onClick={() => {
+                setAuthMode('login'); setAuthError(''); setDuplicateEmail(false); setPassword(''); setConfirmPassword('');
+              }}>Войти с этой почтой</button>
+              <button type="button" className="text-button" onClick={() => {
+                setEmail(''); setAuthError(''); setDuplicateEmail(false); emailInputRef.current?.focus();
+              }}>Указать другую почту</button>
+            </div>}
 
             <div className="auth-card__row">
               <button type="button" className="text-button" onClick={() => setView('chat')}>
@@ -1086,7 +1110,7 @@ function App() {
                   className="admin-nav__item is-active"
                   type="button"
                   onClick={() => {
-                    document.getElementById('admin-title')?.scrollIntoView({ behavior: 'smooth' });
+                    document.getElementById('admin-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
                     setSidebarOpen(false);
                   }}
                 >
@@ -1318,11 +1342,19 @@ function App() {
               </div>
 
               <div className="messages" aria-live="polite" ref={messagesRef}>
-                {activeChat.messages.map((message) => (
+                {activeChat.messages.filter(message => message.role !== 'assistant' ||
+                  Boolean(message.text.trim() || message.recipes?.length || message.recipeDetail || message.nutrition)).map((message) => (
                   <article className={`message message--${message.role}`} key={message.id}>
                     {message.role === 'assistant' && <span className="assistant-mark">S</span>}
                     <div className="message__bubble">
                       <p className="assistant-text">{message.text}</p>
+                      {message.llmStatus && !['ok', 'not_needed'].includes(message.llmStatus) && (
+                        <p className="generation-notice" role="status">
+                          {message.llmStatus === 'not_configured' ? 'LLM не настроена. Показаны результаты поиска и доступные данные источника.' :
+                            message.llmStatus === 'invalid_response' ? 'Ответ LLM не прошёл проверку. Показаны доступные данные источника.' :
+                            'LLM временно недоступна. Найденные рецепты и данные источника остаются доступны.'}
+                        </p>
+                      )}
                       {message.nutrition && <NutritionTable data={message.nutrition} />}
                       {!isGuest && activeChat.messages.length === 1 && message.role === 'assistant' && (
                         <button type="button" className="text-button" onClick={() => setInput(exampleQuestion)}>Попробовать пример с бананом и молоком</button>

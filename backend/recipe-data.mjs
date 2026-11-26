@@ -16,12 +16,17 @@ const nutNames=/орех|миндаль|фундук|арахис|кешью|ф�
 export function ingredientMatches(wanted,name) {
   const wantedInfo=ingredientInfo(wanted),nameInfo=ingredientInfo(name);
   const q=wantedInfo.normalized,n=nameInfo.normalized;
+  if (/^ягод[а-яё]*$/u.test(q)) return /ягод|клубник|земляник|малин|ежевик|черник|голубик|смородин|клюкв|брусник|вишн|черешн|крыжовник|облепих/iu.test(n);
   if (/^орех(?:и|а|ов)?$/u.test(q)) return !/мускат/u.test(n) && nutNames.test(n);
   if (/^молок/u.test(q) && !/сгущ|сух|кокос|миндаль|соев|овсян/u.test(q) && /сгущ|сух|кокос|миндаль|соев|овсян/u.test(n)) return false;
   const tokens=wantedInfo.tokens,actual=nameInfo.tokens;
   return tokens.length>0 && tokens.every(t=>actual.some(a=>a===t || (t.length>=5 && a.startsWith(t))));
 }
 export function ingredientExcluded(wanted,name) {
+  const q=phraseKey(wanted),n=phraseKey(name);
+  // Conservative exclusions for common compound ingredients. This is a
+  // catalog filter, not verification of product labels or medical safety.
+  if(/^сахар[а-яё]*$/u.test(q) && /сахар|сгущ|сгущенк|варень|джем|конфитюр|повидло|сироп|шоколад|мед(?: |$)|медов/iu.test(n))return true;
   if(/^молок/u.test(phraseKey(wanted)) && /молок/u.test(phraseKey(name)))return true;
   return ingredientMatches(wanted,name);
 }

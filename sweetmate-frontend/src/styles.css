@@ -1744,3 +1744,5 @@ button:disabled { cursor: wait; opacity: .65; }
 .demo-entry--guest { flex-basis: 100%; margin-top: 0; }
 .guest-composer { flex-wrap: wrap; }
 .demo-notice { margin: 0; padding: 8px 18px; color: #806c65; background: #f8efe3; font-size: 12px; }
+
+.generation-notice { margin: 10px 0; color: #765e43; font-size: 0.85rem; overflow-wrap: anywhere; }

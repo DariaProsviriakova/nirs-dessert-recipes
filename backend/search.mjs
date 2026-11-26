@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { buildBm25Index, searchRecipes } from '../bm25/src/bm25.mjs';
-import { parseQuery } from '../bm25/src/query.mjs';
+import { parseDialogueQuery as parseQuery } from './query.mjs';
 import { dessertIndex } from './catalog.mjs';
 import { ingredientMatches, ingredientExcluded, macroValues, presentRecipe, recipeImage } from './recipe-data.mjs';
 import { phraseKey, tokenize } from '../bm25/src/text.mjs';
@@ -27,22 +27,32 @@ export function openSearch(filename) {
 export function makeSearch(sourceIndex) {
   const index=dessertIndex(sourceIndex);
   const byId=new Map(index.documents.map(({recipe})=>[recipe.id,recipe]));
+  const ingredientKey=name=>tokenize(name).join('|');
+  const ingredientKeys=new Set([...byId.values()].flatMap(r=>(r.ingredients || []).map(i=>ingredientKey(i.name))).filter(Boolean));
   // Main titles only; aliases must not trigger the full-recipe mode.
   const exact=[...byId.values()].map(r=>[phraseKey(r.title),r]).filter(([name])=>name.length>1);
   return {
     size:byId.size,
+    hasIngredient:name=>ingredientKeys.has(ingredientKey(name)),
     raw:id=>byId.get(id) || null,
     present:(id,options)=>presentRecipe(byId.get(id),options),
     find({ingredients=[],excludedIngredients=[],topic='',filters={},sort='relevance',basis='per100g',requireServings=false}={}) {
       const query=!ingredients.length && /^(?:рецепт[а-яё]*|десерт[а-яё]*)(?:\s+рецепт[а-яё]*|\s+десерт[а-яё]*)?$/iu.test(topic.trim())?'':[topic,...ingredients].filter(Boolean).join(' ');
       const parsed=parseQuery(query);
+      const type=/^(?:пирог[а-я]*|торт[а-я]*|кекс[а-я]*|маффин[а-я]*|печенье|пудинг[а-я]*|суфле|мороженое|чизкейк[а-я]*|мусс[а-я]*)$/u.test(phraseKey(topic))?tokenize(topic):[];
       const scores=new Map(query?searchRecipes(index,query,{...parsed,limit:100}).map(r=>[r.recipe.id,r.score]):[]);
       let candidates=[...byId.values()].filter(r=>{
         const names=(r.ingredients || []).map(i=>i.name);
+        if(type.length && !type.every(t=>tokenize([r.title,...(r.categories || []),...(r.aliases || [])].join(' ')).includes(t)))return false;
         if (!ingredients.every(q=>names.some(name=>ingredientMatches(q,name)))) return false;
         if (excludedIngredients.some(q=>names.some(name=>ingredientExcluded(q,name)))) return false;
+        const titleTokens=tokenize(r.title.replace(/без\s+[а-яё-]+/giu,' '));
+        if(excludedIngredients.some(q=>tokenize(q).some(t=>titleTokens.includes(t))))return false;
         if (!ingredients.length && query && !scores.has(r.id)) return false;
         if (requireServings && !(r.servings>0)) return false;
+        if(filters.minTimeMinutes!=null && (r.timeMinutes==null || r.timeAnomaly || r.timeMinutes<filters.minTimeMinutes))return false;
+        if(filters.minServings!=null && (!(r.servings>0) || r.servings<filters.minServings))return false;
+        if(filters.maxServings!=null && (!(r.servings>0) || r.servings>filters.maxServings))return false;
         if(filters.maxTimeMinutes!=null && (r.timeMinutes==null || r.timeAnomaly || r.timeMinutes>filters.maxTimeMinutes))return false;
         if(filters.nutrition) {
           const macros=macroValues(r,filters.nutritionBasis || 'per100g');
@@ -60,7 +70,7 @@ export function makeSearch(sourceIndex) {
         candidates.sort((a,b)=>macroValues(a,basis).kcal-macroValues(b,basis).kcal || a.id.localeCompare(b.id));
       } else {
         const completeness=r=>(r.servings>0?2:0)+(macroValues(r,'per100g')?.kcal!=null?1:0);
-        candidates.sort((a,b)=>completeness(b)-completeness(a) || (scores.get(b.id)||0)-(scores.get(a.id)||0) || a.title.localeCompare(b.title,'ru'));
+        candidates.sort((a,b)=>(scores.get(b.id)||0)-(scores.get(a.id)||0) || completeness(b)-completeness(a) || a.title.localeCompare(b.title,'ru'));
       }
       return candidates;
     },

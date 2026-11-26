@@ -51,14 +51,13 @@ test('empty query, no results, clarification, network error preserve question',a
   await register(page);
   await page.getByRole('button',{name:'Отправить',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('Введите вопрос');
-  for(const [query,text] of [
-    ['ксдфжщы','Среди найденных десертов нет вариантов'],
-    ['банан до 200 ккал','Уточните, КБЖУ нужны на 100 г или на порцию.'],
-  ]) {
-    await page.getByLabel('Задайте вопрос о десертах').fill(query);
-    await page.getByRole('button',{name:'Отправить',exact:true}).click();
-    await expect(page.locator('.messages').getByText(text,{exact:false})).toBeVisible();
-  }
+  const assistantCount=await page.locator('.message--assistant').count();
+  const empty=await sendTurn(page,'ксдфжщы');
+  expect(empty.status).toBe('empty');expect(empty.answer).toBe('');
+  await expect(page.locator('.message--assistant')).toHaveCount(assistantCount);
+  await expect(page.locator('.recipe-card')).toHaveCount(0);
+  await sendTurn(page,'банан до 200 ккал');
+  await expect(page.locator('.messages').getByText('Уточните, КБЖУ нужны на 100 г или на порцию.',{exact:false})).toBeVisible();
   await page.route('**/api/search',route=>route.abort());
   await page.getByLabel('Задайте вопрос о десертах').fill('шоколадный десерт');
   await page.getByRole('button',{name:'Отправить',exact:true}).click();
@@ -116,10 +115,11 @@ test('impossible ingredient combination is not replaced with unrelated recipes; 
   await register(page);
   const query='у меня есть печенье, яйца, молоко, овощи';
   for (let i=0;i<3;i++) {
-    await page.getByLabel('Задайте вопрос о десертах').fill(query);
-    await page.getByRole('button',{name:'Отправить',exact:true}).click();
-    await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(0);
-    await expect(page.locator('.message--assistant').last()).toContainText('Со всеми перечисленными продуктами подходящих вариантов не нашлось');
+    const count=await page.locator('.message--assistant').count();
+    const result=await sendTurn(page,query);
+    expect(result.status).toBe('empty');expect(result.answer).toBe('');
+    await expect(page.locator('.message--assistant')).toHaveCount(count);
+    await expect(page.locator('.recipe-card')).toHaveCount(0);
     await expect(page.getByLabel('Задайте вопрос о десертах')).toBeInViewport();
     await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeInViewport();
   }
@@ -212,7 +212,8 @@ test('portion size follow-ups answer about the selected recipe without duplicate
   expect(response.context.selectedRecipeId).toBe(selected.recipeDetail.id);
   expect(response.recipes).toEqual([]);
   await expect(page.locator('.message--assistant').last()).toContainText('Вес одной порции в граммах не указан');
-  await expect(page.locator('.message--assistant').last()).toContainText(String(first.recipes[0].servings));
+  if(first.recipes[0].servings)await expect(page.locator('.message--assistant').last()).toContainText(String(first.recipes[0].servings));
+  else await expect(page.locator('.message--assistant').last()).toContainText('число порций в источнике не указано');
   await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(0);
  }
  await page.reload();
@@ -240,8 +241,11 @@ test('all-chat recipe memory survives another search, selecting details, reload 
  await page.evaluate(()=>{
   for(const key of Object.keys(localStorage).filter(k=>k.startsWith('sweetmate:v2:chats:'))) {
    const chats=JSON.parse(localStorage.getItem(key));
-   for(const chat of chats)for(const message of chat.messages)if(message.context) {
-    delete message.context.knownRecipeIds;delete message.context.recipeGroups;
+   for(const chat of chats) {
+    delete chat.context;
+    for(const message of chat.messages)if(message.context) {
+     delete message.context.knownRecipeIds;delete message.context.recipeGroups;
+    }
    }
    localStorage.setItem(key,JSON.stringify(chats));
   }
@@ -333,4 +337,226 @@ test('nut allergy produces new recommendations and confirmation preserves the re
  expect(retry.context.allergies).toContain('орехи');
  expect(retry.recipes.length).toBeGreaterThan(0);
  for(const r of retry.recipes) expect(r.ingredientEntries.some(i=>/орех|миндаль|фундук|арахис|кешью|фисташ|пекан|макадам/iu.test(i.name))).toBe(false);
+});
+
+
+test('berry dialogue pages real recipes without duplicates and survives reload',async({page})=>{
+ await register(page);
+ const greeting=await sendTurn(page,'привет');
+ expect(greeting.recipes).toEqual([]);
+ const first=await sendTurn(page,'хочу что-то ягодное');
+ expect(first.action).toBe('search');expect(first.recipes).toHaveLength(3);
+ await expect(page.locator('.generation-notice').last()).toContainText('LLM не настроена');
+ await page.reload();
+ const more=await sendTurn(page,'еще');
+ expect(more.action).toBe('search');expect(more.recipes).toHaveLength(3);
+ expect(more.recipes.every(r=>!first.recipes.some(old=>old.id===r.id))).toBe(true);
+ const strawberry=await sendTurn(page,'клубника');
+ expect(strawberry.context.ingredients).toEqual(['клубника']);
+ expect(strawberry.recipes.length).toBeGreaterThan(0);
+ expect(strawberry.recipes.every(r=>r.matchedIngredients.includes('клубника'))).toBe(true);
+ const calories=await sendTurn(page,'сколько калорий?');
+ expect(calories.recipes).toEqual([]);
+ await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(0);
+});
+
+test('unavailable model reports a separate status while source recipe cards remain usable',async({page})=>{
+ await register(page);
+ await page.route('**/api/search',async route=>{
+  const response=await route.fetch();
+  const result=await response.json();
+  await route.fulfill({response,json:{...result,llmStatus:'unavailable'}});
+ });
+ await sendTurn(page,'есть банан и молоко');
+ await expect(page.locator('.recipe-card')).toHaveCount(3);
+ await expect(page.locator('.generation-notice').last()).toContainText('LLM временно недоступна');
+ await page.locator('.recipe-card').first().getByRole('button',{name:'Открыть полный рецепт'}).click();
+ await expect(page.locator('.recipe-detail')).toHaveCount(1);
+});
+
+
+test('duplicate registration offers login and a focused alternative email field',async({page})=>{
+ const email=await register(page);
+ await page.locator('.user-menu__button').click();
+ await page.getByRole('button',{name:'Выйти',exact:true}).click();
+ await page.getByRole('button',{name:'Зарегистрироваться',exact:true}).click();
+ async function duplicate() {
+  await page.getByLabel('Электронная почта').fill(email);
+  await page.getByLabel('Пароль',{exact:true}).fill(password);
+  await page.getByLabel('Повторите пароль',{exact:true}).fill(password);
+  await page.getByRole('button',{name:'Зарегистрироваться',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Аккаунт уже существует');
+ }
+ await duplicate();
+ await page.getByRole('button',{name:'Указать другую почту',exact:true}).click();
+ await expect(page.getByLabel('Электронная почта')).toHaveValue('');
+ await expect(page.getByLabel('Электронная почта')).toBeFocused();
+ await duplicate();
+ await page.getByRole('button',{name:'Войти с этой почтой',exact:true}).click();
+ await expect(page.getByLabel('Электронная почта')).toHaveValue(email);
+ await page.getByLabel('Пароль',{exact:true}).fill(password);
+ await page.getByRole('button',{name:'Войти',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeVisible();
+});
+
+
+test('favorites return to their source chat, removal preserves history and deleting the last chat creates an empty one',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ const found=await sendTurn(page,'есть банан и молоко');
+ await page.locator('.recipe-card').first().getByRole('button',{name:'Добавить в избранное'}).click();
+ await page.getByRole('button',{name:'Новый чат',exact:false}).click();
+ await expect(page.locator('.recipe-card')).toHaveCount(0);
+ await page.locator('.favorite-entry').first().locator('button').first().click();
+ await expect(page.locator('.recipe-card').first()).toContainText(found.recipes[0].title);
+ const messages=await page.locator('.messages .message').count();
+ await page.getByRole('button',{name:'Удалить '+found.recipes[0].title+' из избранного',exact:true}).click();
+ await expect(page.locator('.favorite-entry')).toHaveCount(0);
+ await expect(page.locator('.messages .message')).toHaveCount(messages);
+ while(await page.getByRole('button',{name:/^Удалить чат /}).count()>1) {
+  await page.getByRole('button',{name:/^Удалить чат /}).first().click();
+ }
+ await page.getByRole('button',{name:/^Удалить чат /}).click();
+ await expect(page.getByRole('button',{name:/^Удалить чат /})).toHaveCount(1);
+ await expect(page.locator('.messages .message')).toHaveCount(1);
+ await expect(page.locator('.recipe-card')).toHaveCount(0);
+ await profile(page);
+ page.once('dialog',dialog=>dialog.dismiss());
+ await page.getByRole('button',{name:'Удалить учетную запись',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Удалить учетную запись',exact:true})).toBeVisible();
+ expect((await page.request.get('/api/auth/me')).status()).toBe(200);
+});
+
+
+test('durian has a blank result without an assistant bubble; constraints and all-chat memory survive reload',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ const first=await sendTurn(page,'есть банан и молоко');
+ const chosen=first.recipes[0];
+ const count=await page.locator('.message--assistant').count();
+ const cards=await page.locator('.recipe-card').count();
+ const empty=await sendTurn(page,'у меня есть дуриан');
+ expect(empty.status).toBe('empty');expect(empty.answer).toBe('');
+ expect(empty.recipes).toEqual([]);expect(empty.context.pendingAction).toBeNull();
+ await expect(page.locator('.message--assistant')).toHaveCount(count);
+ await expect(page.locator('.recipe-card')).toHaveCount(cards);
+ await expect(page.locator('.messages .message').last()).toHaveClass('message message--user');
+ await expect(page.locator('.messages .message').last()).toContainText('у меня есть дуриан');
+ await expect(page.getByRole('button',{name:'Отправить',exact:true})).toBeEnabled();
+ await expect(page.getByRole('alert')).toHaveCount(0);
+ await page.reload();
+ await expect(page.locator('.message--assistant')).toHaveCount(count);
+ const next=await sendTurn(page,'без орехов');
+ expect(next.context.ingredients).toEqual(['дуриан']);
+ expect(next.context.excludedIngredients).toContain('орехи');
+ expect(next.status).toBe('empty');expect(next.answer).toBe('');
+ const old=await sendTurn(page,'КБЖУ '+chosen.title);
+ expect(old.nutrition.recipeId).toBe(chosen.id);
+});
+
+
+test('a calorie follow-up after a time question opens only the chosen dish nutrition panel',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ const first=await sendTurn(page,'есть банан и молоко');
+ const time=await sendTurn(page,'сколько по времени готовить третье');
+ expect(time.context.selectedRecipeId).toBe(first.recipes[2].id);
+ const result=await sendTurn(page,'а калорий сколько');
+ expect(result.action).toBe('nutrition');expect(result.nutrition.recipeId).toBe(first.recipes[2].id);
+ expect(result.recipes).toEqual([]);
+ await expect(page.locator('.message--assistant').last().locator('.nutrition-result')).toBeVisible();
+ await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(0);
+});
+
+test('a normal ingredient without template starts a fresh search after durian and empty legacy bubbles stay hidden',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ for(const [query,ingredient] of [['банан есть','банан'],['банан','банан'],['у меня есть бана','банан'],['абрикос','абрикос']]) {
+  const empty=await sendTurn(page,'у меня есть дуриан');
+  expect(empty.status).toBe('empty');
+  await page.reload();
+  const result=await sendTurn(page,query);
+  expect(result.status).toBe('found');expect(result.context.ingredients).toEqual([ingredient]);
+  expect(result.recipes.length).toBeGreaterThan(0);
+  await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(result.recipes.length);
+ }
+ const count=await page.locator('.message--assistant').count();
+ await page.evaluate(()=>{
+  for(const key of Object.keys(localStorage).filter(k=>k.startsWith('sweetmate:v2:chats:'))) {
+   const chats=JSON.parse(localStorage.getItem(key));
+   for(const chat of chats)chat.messages.push({id:'legacy-empty',role:'assistant',text:'',recipes:[]});
+   localStorage.setItem(key,JSON.stringify(chats));
+  }
+ });
+ await page.reload();
+ await expect(page.locator('.message--assistant')).toHaveCount(count);
+});
+
+
+test('banana exclusion combined with ten people returns different recipes scaled to ten',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ await sendTurn(page,'у меня есть банан');
+ for(const query of ['не бананы, что то на 10 человек','блюдо на 10 человек без бананов']) {
+  const result=await sendTurn(page,query);
+  expect(result.action).toBe('search');expect(result.recipes.length).toBeGreaterThan(0);
+  expect(result.context.excludedIngredients).toContain('банан');
+  expect(result.context.ingredients).not.toContain('банан');
+  expect(result.recipes.every(r=>r.servings===10)).toBe(true);
+  expect(result.recipes.every(r=>r.ingredientEntries.every(i=>!/банан/iu.test(i.name)))).toBe(true);
+  await expect(page.locator('.message--assistant').last()).toContainText('Порций: 10');
+  await page.reload();
+ }
+});
+
+
+test('failed durian inventory, allergy and a new pie request form a complete conversation',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ expect((await sendTurn(page,'дуриан есть')).status).toBe('empty');
+ const count=await page.locator('.message--assistant').count();
+ const allergy=await sendTurn(page,'аллергия на орехи');
+ expect(allergy.action).toBe('search');
+ await expect(page.locator('.message--assistant')).toHaveCount(count+1);
+ expect(allergy.recipes).toHaveLength(3);
+ await expect(page.locator('.message--assistant').last().locator('.recipe-card')).toHaveCount(3);
+ await expect(page.locator('.message--assistant').last()).not.toContainText('Учту исключение');
+ expect(allergy.recipes.every(r=>r.ingredientEntries.every(i=>!/орех|миндаль|арахис|фундук|кешью|фисташ/iu.test(i.name)))).toBe(true);
+ const pie=await sendTurn(page,'хочу пирог');
+ expect(pie.status).toBe('found');expect(pie.recipes.length).toBeGreaterThan(0);
+ expect(pie.context.ingredients).not.toContain('дуриан');
+ expect(pie.context.allergies).toContain('орехи');
+ const milk=await sendTurn(page,'у меня есть молоко и яйца');
+ expect(milk.recipes.length).toBeGreaterThan(0);
+ const sugar=await sendTurn(page,'у меня аллергия на сахар');
+ expect(sugar.action).toBe('search');
+ const filtered=await sendTurn(page,'подбери без сахара');
+ for(const recipe of filtered.recipes)expect(recipe.ingredientEntries.some(i=>/сахар|сгущ|джем|шоколад/iu.test(i.name))).toBe(false);
+});
+
+
+test('with durian after apricots produces an empty result rather than repeating apricot cards',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'Попробовать как пользователь',exact:true}).click();
+ await page.getByRole('button',{name:'Отправить',exact:true}).waitFor();
+ const apricot=await sendTurn(page,'с абрикосами');
+ expect(apricot.recipes.length).toBeGreaterThan(0);
+ const assistantCount=await page.locator('.message--assistant').count();
+ const count=await page.locator('.recipe-card').count();
+ const result=await sendTurn(page,'с дурианом');
+ expect(result.status).toBe('empty');expect(result.answer).toBe('');expect(result.recipes).toEqual([]);
+ expect(result.context.ingredients.some(i=>/дуриан/iu.test(i))).toBe(true);
+ expect(result.context.ingredients.some(i=>/абрикос/iu.test(i))).toBe(false);
+ await expect(page.locator('.message--assistant')).toHaveCount(assistantCount);
+ await expect(page.locator('.recipe-card')).toHaveCount(count);
+ await page.reload();
+ const next=await sendTurn(page,'с бананом');
+ expect(next.status).toBe('found');
+ expect(next.recipes.every(r=>r.matchedIngredients.includes('банан'))).toBe(true);
 });

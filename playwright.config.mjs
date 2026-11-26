@@ -9,6 +9,6 @@ export default defineConfig({
     env:{HOST:'127.0.0.1',PORT:'8011',APP_ORIGINS:'http://127.0.0.1:8011',
       DB_PATH:'backend/.test-artifacts/e2e-'+randomUUID()+'.sqlite',
       ADMIN_EMAIL:'admin-e2e@example.test',ADMIN_PASSWORD:'Synthetic-admin-2026',
-      LLM_PROVIDER:'none',LLM_API_KEY:''},
+      AUTH_RATE_LIMIT:'200',LLM_PROVIDER:'none',LLM_API_KEY:''},
   },
 });

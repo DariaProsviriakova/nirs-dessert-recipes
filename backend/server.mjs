@@ -75,7 +75,7 @@ export async function createApp({settings=config(),db=openStore(settings.dbPath)
           return session.account;
         };
         if (['/api/auth/register','/api/auth/login'].includes(route) && method==='POST') {
-          limit(authAttempts,req.socket.remoteAddress,15);
+          limit(authAttempts,req.socket.remoteAddress,settings.authAttemptsPerMinute || 15);
           const data=await body(req),email=emailAddress(data.email);
           if (typeof data.password!=='string' || data.password.length>128 || !data.password) throw new ApiError(400,'Укажите пароль.');
           const testRole=settings.demoEnabled?demoRole(email,data.password):null;
