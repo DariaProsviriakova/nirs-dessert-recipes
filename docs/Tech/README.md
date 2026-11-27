@@ -12,4 +12,4 @@
 | [06-bm25-and-benchmark.md](06-bm25-and-benchmark.md) | Корпус, поиск и benchmark |
 | [WORKSPACE_MAP.md](WORKSPACE_MAP.md) | Карта репозитория |
 
-Состояние исходников сверено 2026-11-26. Проверки запуска отражены отдельно в [Service](../Service/verification.md).
+Состояние исходников сверено 2026-11-28. Проверки запуска отражены отдельно в [Service](../Service/verification.md).
