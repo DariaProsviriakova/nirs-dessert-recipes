@@ -101,6 +101,14 @@ function portions(query) {
 function timeQuestion(query) {
   return /времен[иа]|по времени|долго|длительност|сколько.*(?:минут|час|готов|варить|печь|выпек)|когда.*готов/iu.test(query);
 }
+function unsupportedDessertRequest(text) {
+  const soup=/(?:^| )(?:суп[а-я]*|борщ[а-я]*|щи|солянк[а-я]*|ух[а-я]*|окрошк[а-я]*)(?: |$)/u.test(text);
+  const savoryIngredient=/(?:^| )(?:куриц[а-я]*|мяс[а-я]*|говядин[а-я]*|свинин[а-я]*|рыб[а-я]*|колбас[а-я]*|картоф[а-я]*)(?: |$)/u.test(text);
+  const savorySalad=/(?:^| )салат(?: |$)/u.test(text) &&
+    /(?:^| )(?:огур[а-я]*|помидор[а-я]*|томат[а-я]*|куриц[а-я]*|мяс[а-я]*|колбас[а-я]*|рыб[а-я]*|картоф[а-я]*|капуст[а-я]*)(?: |$)/u.test(text);
+  const dessert=/(?:^| )(?:десерт[а-я]*|торт[а-я]*|пирог[а-я]*|кекс[а-я]*|печень[а-я]*|пудинг[а-я]*|суфле|морожен[а-я]*|чизкейк[а-я]*|мусс[а-я]*|конфет[а-я]*)(?: |$)/u.test(text);
+  return soup || savorySalad || (savoryIngredient && !dessert);
+}
 function basis(query) {query=phraseKey(query);return /на порци/iu.test(query)?'perServing':/весь|все блюдо|целый/iu.test(query)?'wholeDish':'per100g';}
 function canonicalNutrition(recipe,query) {
   const key=basis(query),values=macroValues(recipe,key);
@@ -110,6 +118,8 @@ function canonicalNutrition(recipe,query) {
 export async function converse({query,context,history=[],search,llm}) {
   const state=cleanContext(context,search),prior={...state};
   const text=phraseKey(query),targetServings=portions(query);
+  if(unsupportedDessertRequest(text))
+    return answerResult('clarification','SweetMate подбирает только десерты, поэтому этот несладкий запрос не подходит каталогу. Напишите, какой десерт хотите найти, или перечислите продукты для десерта.',[],null,null,state,'not_needed','clarification');
   const more=/^(?:а )?(?:еще|другие|другие варианты|еще варианты|что еще|покажи еще|предложи еще|давай еще)(?: пожалуйста)?$/u.test(text);
   const declaredAllergies=allergyFoods(query);
   const rememberedAllergies=history.filter(m=>m.role==='user').flatMap(m=>allergyFoods(m.text || ''));
@@ -407,9 +417,8 @@ export async function converse({query,context,history=[],search,llm}) {
   return answerResult(status,generation.answer || fallback,['nutrition','clarification'].includes(action)?[]:cards,detail,nutrition,state,generation.llmStatus,action);
 }
 function answerResult(status,answer,recipes,recipeDetail,nutrition,context,llmStatus,action='clarification') {
-  // No-match is a successful empty result, with no generated text, cards or
-  // implicit offer to drop constraints. Keep context for the next user turn.
-  if(status==='empty')return {status,answer:'',recipes:[],recipeDetail:null,nutrition:null,
+  // No-match is explicit, grounded feedback with no invented recipes or cards.
+  if(status==='empty')return {status,answer:'Не нашла подходящий десерт в каталоге. Попробуйте указать обычные съедобные ингредиенты или название десерта.',recipes:[],recipeDetail:null,nutrition:null,
     context:{...context,pendingAction:null},llmStatus:'not_needed',action};
   return {status,answer,recipes,recipeDetail,nutrition,context,llmStatus,action};
 }

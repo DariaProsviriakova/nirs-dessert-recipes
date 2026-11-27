@@ -821,7 +821,7 @@ function App() {
         ...(result.recipeDetail ? { recipeDetail: result.recipeDetail } : { recipes: result.recipes }) };
       setChats(current => current.map(chat => chat.id === chatId ? {
         ...chat, context: result.context,
-        messages: result.status === 'empty' ? chat.messages : [...chat.messages, answer],
+        messages: [...chat.messages, answer],
       } : chat));
       setInput(current => current === rawQuestion ? '' : current);
     } catch (error) {
