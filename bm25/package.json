@@ -10,6 +10,8 @@
     "search": "node scripts/search.mjs",
     "benchmark:prepare": "node scripts/create-benchmark.mjs",
     "benchmark": "node scripts/benchmark.mjs",
+    "benchmark:course:prepare": "node scripts/create-course-benchmark.mjs",
+    "benchmark:course": "node --env-file-if-exists=../.env scripts/course-benchmark.mjs",
     "tune": "node scripts/tune-weights.mjs"
   },
   "dependencies": {

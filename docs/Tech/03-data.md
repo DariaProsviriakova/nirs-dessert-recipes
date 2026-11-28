@@ -6,10 +6,11 @@
 
 - bm25/data/raw/ — Parquet-источники.
 - bm25/data/generated/ — нормализованный корпус и сжатый индекс.
-- bm25/data/benchmark-results/ — локальные результаты benchmark.
+- bm25/data/benchmark-results/ — локальные результаты benchmark полного корпуса.
 - bm25/data/manual-aliases.json и manual-benchmark-queries.json — ручные материалы, хранящиеся в Git.
+- bm25/data/course-benchmark.json и course-benchmark-results.json — отдельные статические JSON-файлы учебного набора из 30 документов и отчёта.
 
-Сырые и сгенерированные данные исключены из Git. На новом клоне выполни npm run prepare:data. Состав и метрики описаны в [руководстве BM25 и benchmark](06-bm25-and-benchmark.md).
+Сырые Parquet и полный сгенерированный корпус исключены из Git. Для рабочего приложения на новом клоне выполни npm run prepare:data. Учебный набор запускается отдельно; см. [06-bm25-and-benchmark.md](06-bm25-and-benchmark.md) и [07-course-rag-benchmark.md](07-course-rag-benchmark.md).
 
 Запись рецепта может включать источник, категории, описание, ингредиенты, шаги, время, порции, КБЖУ и URL изображения. Фотофайлы не скачиваются: используются URL Povarenok с локальной заглушкой, если подходящей ссылки нет.
 

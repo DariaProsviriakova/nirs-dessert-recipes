@@ -1,0 +1,1297 @@
+{
+  "benchmarkVersion": 1,
+  "benchmarkTitle": "Учебный benchmark RAG/BM25 — занятие 3",
+  "corpusDocumentCount": 30,
+  "queryCount": 15,
+  "llmRequested": false,
+  "llmProvider": "none",
+  "metricNotes": {
+    "answerAccuracy": "Доля обычных вопросов, где есть хотя бы одна карточка и все показанные карточки входят в gold-набор. Это точность рекомендаций; свободный текст отдельно требует ручной проверки.",
+    "correctRejectionRate": "Доля ловушек без карточек и с непустым отказом или уточнением.",
+    "retrieval": "BM25 ранжирует запрос по фиксированному набору из 30 документов; в отчёте сохраняется top-10."
+  },
+  "summary": {
+    "corpusDocuments": 30,
+    "answerableQuestions": 10,
+    "trapQuestions": 5,
+    "recallAt5": 0.8182234432234432,
+    "mrrAt10": 1,
+    "answerAccuracy": 1,
+    "correctRejectionRate": 1,
+    "correctAnswers": 10,
+    "correctRejections": 5
+  },
+  "perQuery": [
+    {
+      "id": "Q01",
+      "type": "answerable",
+      "query": "Хочу десерт с бананом",
+      "goldDocIds": [
+        "D01",
+        "D02",
+        "D03"
+      ],
+      "retrieved": [
+        {
+          "id": "D03",
+          "sourceId": "povarenok-100414",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/",
+          "score": 2.0703
+        },
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 0.5892
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.5296
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 0.4771
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 0.4163
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 0.4138
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 0.3824
+        },
+        {
+          "id": "D07",
+          "sourceId": "povarenok-100013",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/",
+          "score": 0.3306
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 0.3197
+        },
+        {
+          "id": "D14",
+          "sourceId": "povarenok-100153",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/",
+          "score": 0.3013
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D01",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/"
+        },
+        {
+          "id": "D02",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/"
+        },
+        {
+          "id": "D03",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 1,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q02",
+      "type": "answerable",
+      "query": "Найди что-нибудь с шоколадом",
+      "goldDocIds": [
+        "D03",
+        "D04",
+        "D05",
+        "D06",
+        "D14",
+        "D28",
+        "D30"
+      ],
+      "retrieved": [
+        {
+          "id": "D14",
+          "sourceId": "povarenok-100153",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/",
+          "score": 8.9836
+        },
+        {
+          "id": "D05",
+          "sourceId": "povarenok-100024",
+          "title": "Шоколадный кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100024/",
+          "score": 8.7671
+        },
+        {
+          "id": "D06",
+          "sourceId": "povarenok-100033",
+          "title": "Конфеты \"Ищите женщину\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100033/",
+          "score": 7.7573
+        },
+        {
+          "id": "D04",
+          "sourceId": "povarenok-100005",
+          "title": "Брауни",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100005/",
+          "score": 5.8875
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 5.5857
+        },
+        {
+          "id": "D03",
+          "sourceId": "povarenok-100414",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/",
+          "score": 4.1134
+        },
+        {
+          "id": "D30",
+          "sourceId": "povarenok-100115",
+          "title": "Шоколадный кекс на минералке",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100115/",
+          "score": 3.6558
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.1422
+        },
+        {
+          "id": "D22",
+          "sourceId": "povarenok-100043",
+          "title": "Печенье \"Сладкие пельмени\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100043/",
+          "score": 0.1375
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D14",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/"
+        },
+        {
+          "id": "D05",
+          "title": "Шоколадный кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100024/"
+        },
+        {
+          "id": "D06",
+          "title": "Конфеты \"Ищите женщину\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100033/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 0.7142857142857143,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q03",
+      "type": "answerable",
+      "query": "Подбери сладкое с яблоком",
+      "goldDocIds": [
+        "D07",
+        "D08",
+        "D09",
+        "D20"
+      ],
+      "retrieved": [
+        {
+          "id": "D20",
+          "sourceId": "povarenok-100116",
+          "title": "Конфеты из моркови и яблок",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100116/",
+          "score": 23.4343
+        },
+        {
+          "id": "D09",
+          "sourceId": "povarenok-100028",
+          "title": "Творожный штрудель с яблоками и вишней",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100028/",
+          "score": 11.5398
+        },
+        {
+          "id": "D07",
+          "sourceId": "povarenok-100013",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/",
+          "score": 8.8035
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 8.1177
+        },
+        {
+          "id": "D22",
+          "sourceId": "povarenok-100043",
+          "title": "Печенье \"Сладкие пельмени\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100043/",
+          "score": 1.1374
+        },
+        {
+          "id": "D19",
+          "sourceId": "povarenok-100072",
+          "title": "Торт \"В горошек\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100072/",
+          "score": 0.419
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 0.4086
+        },
+        {
+          "id": "D30",
+          "sourceId": "povarenok-100115",
+          "title": "Шоколадный кекс на минералке",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100115/",
+          "score": 0.3952
+        },
+        {
+          "id": "D06",
+          "sourceId": "povarenok-100033",
+          "title": "Конфеты \"Ищите женщину\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100033/",
+          "score": 0.3578
+        },
+        {
+          "id": "D24",
+          "sourceId": "povarenok-100098",
+          "title": "Печенье \"Спекулатиус\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100098/",
+          "score": 0.353
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D20",
+          "title": "Конфеты из моркови и яблок",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100116/"
+        },
+        {
+          "id": "D09",
+          "title": "Творожный штрудель с яблоками и вишней",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100028/"
+        },
+        {
+          "id": "D07",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 1,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q04",
+      "type": "answerable",
+      "query": "Хочу десерт с творогом",
+      "goldDocIds": [
+        "D09",
+        "D10",
+        "D11",
+        "D12",
+        "D14",
+        "D18"
+      ],
+      "retrieved": [
+        {
+          "id": "D12",
+          "sourceId": "povarenok-100114",
+          "title": "Творожные пирожные",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100114/",
+          "score": 6.713
+        },
+        {
+          "id": "D18",
+          "sourceId": "povarenok-101698",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/",
+          "score": 6.4868
+        },
+        {
+          "id": "D14",
+          "sourceId": "povarenok-100153",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/",
+          "score": 5.8123
+        },
+        {
+          "id": "D09",
+          "sourceId": "povarenok-100028",
+          "title": "Творожный штрудель с яблоками и вишней",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100028/",
+          "score": 5.7779
+        },
+        {
+          "id": "D11",
+          "sourceId": "povarenok-100111",
+          "title": "Кексы \"Праздничные\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100111/",
+          "score": 4.9251
+        },
+        {
+          "id": "D10",
+          "sourceId": "povarenok-100076",
+          "title": "Торт \"Апельсиновая мечта\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100076/",
+          "score": 4.5178
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.5296
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 0.4771
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 0.4163
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 0.4138
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D12",
+          "title": "Творожные пирожные",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100114/"
+        },
+        {
+          "id": "D18",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/"
+        },
+        {
+          "id": "D14",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 0.8333333333333334,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q05",
+      "type": "answerable",
+      "query": "Подбери десерт с малиной",
+      "goldDocIds": [
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "retrieved": [
+        {
+          "id": "D13",
+          "sourceId": "povarenok-100035",
+          "title": "Торт \"Малиновое сердце\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100035/",
+          "score": 15.3224
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 9.349
+        },
+        {
+          "id": "D14",
+          "sourceId": "povarenok-100153",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/",
+          "score": 8.0886
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.5296
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 0.4771
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 0.4163
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 0.3824
+        },
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 0.3776
+        },
+        {
+          "id": "D07",
+          "sourceId": "povarenok-100013",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/",
+          "score": 0.3306
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 0.3197
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D13",
+          "title": "Торт \"Малиновое сердце\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100035/"
+        },
+        {
+          "id": "D15",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/"
+        },
+        {
+          "id": "D14",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 1,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q06",
+      "type": "answerable",
+      "query": "Подбери что-нибудь с тыквой",
+      "goldDocIds": [
+        "D02",
+        "D16",
+        "D17",
+        "D18"
+      ],
+      "retrieved": [
+        {
+          "id": "D16",
+          "sourceId": "povarenok-100674",
+          "title": "Карамельно-пикантная запеченная тыква",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100674/",
+          "score": 25.3398
+        },
+        {
+          "id": "D17",
+          "sourceId": "povarenok-100864",
+          "title": "Тыквенная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100864/",
+          "score": 11.8953
+        },
+        {
+          "id": "D18",
+          "sourceId": "povarenok-101698",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/",
+          "score": 10.0326
+        },
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 8.4284
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D16",
+          "title": "Карамельно-пикантная запеченная тыква",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100674/"
+        },
+        {
+          "id": "D17",
+          "title": "Тыквенная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100864/"
+        },
+        {
+          "id": "D18",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 1,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q07",
+      "type": "answerable",
+      "query": "Хочу что-нибудь с морковью",
+      "goldDocIds": [
+        "D19",
+        "D20",
+        "D21"
+      ],
+      "retrieved": [
+        {
+          "id": "D20",
+          "sourceId": "povarenok-100116",
+          "title": "Конфеты из моркови и яблок",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100116/",
+          "score": 29.5595
+        },
+        {
+          "id": "D19",
+          "sourceId": "povarenok-100072",
+          "title": "Торт \"В горошек\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100072/",
+          "score": 9.5551
+        },
+        {
+          "id": "D21",
+          "sourceId": "povarenok-100372",
+          "title": "Морковно-гречневый кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100372/",
+          "score": 8.8133
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D20",
+          "title": "Конфеты из моркови и яблок",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100116/"
+        },
+        {
+          "id": "D19",
+          "title": "Торт \"В горошек\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100072/"
+        },
+        {
+          "id": "D21",
+          "title": "Морковно-гречневый кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100372/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 1,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q08",
+      "type": "answerable",
+      "query": "Найди десерт с лимоном",
+      "goldDocIds": [
+        "D02",
+        "D05",
+        "D07",
+        "D13",
+        "D15",
+        "D22",
+        "D23",
+        "D24"
+      ],
+      "retrieved": [
+        {
+          "id": "D07",
+          "sourceId": "povarenok-100013",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/",
+          "score": 6.6268
+        },
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 5.9421
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 5.6588
+        },
+        {
+          "id": "D22",
+          "sourceId": "povarenok-100043",
+          "title": "Печенье \"Сладкие пельмени\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100043/",
+          "score": 5.3671
+        },
+        {
+          "id": "D05",
+          "sourceId": "povarenok-100024",
+          "title": "Шоколадный кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100024/",
+          "score": 4.4895
+        },
+        {
+          "id": "D24",
+          "sourceId": "povarenok-100098",
+          "title": "Печенье \"Спекулатиус\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100098/",
+          "score": 4.4516
+        },
+        {
+          "id": "D23",
+          "sourceId": "povarenok-100085",
+          "title": "Профитроли с баварским кремом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100085/",
+          "score": 4.1327
+        },
+        {
+          "id": "D13",
+          "sourceId": "povarenok-100035",
+          "title": "Торт \"Малиновое сердце\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100035/",
+          "score": 3.8866
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.5296
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 0.4771
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D07",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/"
+        },
+        {
+          "id": "D02",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/"
+        },
+        {
+          "id": "D15",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 0.625,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q09",
+      "type": "answerable",
+      "query": "Подбери десерт с апельсином",
+      "goldDocIds": [
+        "D07",
+        "D08",
+        "D10",
+        "D18",
+        "D21",
+        "D25",
+        "D26",
+        "D27"
+      ],
+      "retrieved": [
+        {
+          "id": "D27",
+          "sourceId": "povarenok-100412",
+          "title": "Французский торт с апельсином и шалфеем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100412/",
+          "score": 8.9883
+        },
+        {
+          "id": "D07",
+          "sourceId": "povarenok-100013",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/",
+          "score": 6.5972
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 6.2624
+        },
+        {
+          "id": "D10",
+          "sourceId": "povarenok-100076",
+          "title": "Торт \"Апельсиновая мечта\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100076/",
+          "score": 5.5426
+        },
+        {
+          "id": "D25",
+          "sourceId": "povarenok-100216",
+          "title": "Миндальное печенье \"В подарок\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100216/",
+          "score": 5.4579
+        },
+        {
+          "id": "D18",
+          "sourceId": "povarenok-101698",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/",
+          "score": 5.3348
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 4.7124
+        },
+        {
+          "id": "D21",
+          "sourceId": "povarenok-100372",
+          "title": "Морковно-гречневый кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100372/",
+          "score": 4.0707
+        },
+        {
+          "id": "D01",
+          "sourceId": "povarenok-100077",
+          "title": "Банановый десерт “Нежность“",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100077/",
+          "score": 0.5296
+        },
+        {
+          "id": "D15",
+          "sourceId": "povarenok-100387",
+          "title": "Ванильная панна-котта с малиновым желе",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100387/",
+          "score": 0.4138
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D27",
+          "title": "Французский торт с апельсином и шалфеем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100412/"
+        },
+        {
+          "id": "D07",
+          "title": "Яблочно-цитрусовый джем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100013/"
+        },
+        {
+          "id": "D26",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 0.625,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q10",
+      "type": "answerable",
+      "query": "Хочу десерт с орехами",
+      "goldDocIds": [
+        "D02",
+        "D03",
+        "D04",
+        "D08",
+        "D12",
+        "D16",
+        "D19",
+        "D21",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D30"
+      ],
+      "retrieved": [
+        {
+          "id": "D30",
+          "sourceId": "povarenok-100115",
+          "title": "Шоколадный кекс на минералке",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100115/",
+          "score": 5.2748
+        },
+        {
+          "id": "D04",
+          "sourceId": "povarenok-100005",
+          "title": "Брауни",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100005/",
+          "score": 4.8122
+        },
+        {
+          "id": "D16",
+          "sourceId": "povarenok-100674",
+          "title": "Карамельно-пикантная запеченная тыква",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100674/",
+          "score": 4.5445
+        },
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 4.2835
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 4.0799
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 3.8502
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 3.2573
+        },
+        {
+          "id": "D21",
+          "sourceId": "povarenok-100372",
+          "title": "Морковно-гречневый кекс",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100372/",
+          "score": 2.7722
+        },
+        {
+          "id": "D19",
+          "sourceId": "povarenok-100072",
+          "title": "Торт \"В горошек\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100072/",
+          "score": 2.643
+        },
+        {
+          "id": "D12",
+          "sourceId": "povarenok-100114",
+          "title": "Творожные пирожные",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100114/",
+          "score": 2.5815
+        }
+      ],
+      "answer": "Подобрала десерты со всеми указанными продуктами. На карточках отмечено совпадение; дополнительные ингредиенты перечислены отдельно. Что вам больше нравится?",
+      "answerCards": [
+        {
+          "id": "D30",
+          "title": "Шоколадный кекс на минералке",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100115/"
+        },
+        {
+          "id": "D04",
+          "title": "Брауни",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100005/"
+        },
+        {
+          "id": "D16",
+          "title": "Карамельно-пикантная запеченная тыква",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100674/"
+        }
+      ],
+      "llmStatus": "not_configured",
+      "metrics": {
+        "recallAt5": 0.38461538461538464,
+        "reciprocalRankAt10": 1,
+        "answerCorrect": true
+      }
+    },
+    {
+      "id": "Q11",
+      "type": "trap",
+      "query": "Как приготовить куриный суп?",
+      "goldDocIds": [],
+      "retrieved": [
+        {
+          "id": "D17",
+          "sourceId": "povarenok-100864",
+          "title": "Тыквенная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100864/",
+          "score": 2.7871
+        },
+        {
+          "id": "D11",
+          "sourceId": "povarenok-100111",
+          "title": "Кексы \"Праздничные\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100111/",
+          "score": 2.6504
+        },
+        {
+          "id": "D04",
+          "sourceId": "povarenok-100005",
+          "title": "Брауни",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100005/",
+          "score": 2.3322
+        },
+        {
+          "id": "D18",
+          "sourceId": "povarenok-101698",
+          "title": "Тыквенная творожно-шоколадная запеканка",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/101698/",
+          "score": 2.2585
+        },
+        {
+          "id": "D22",
+          "sourceId": "povarenok-100043",
+          "title": "Печенье \"Сладкие пельмени\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100043/",
+          "score": 2.1893
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 2.1242
+        },
+        {
+          "id": "D03",
+          "sourceId": "povarenok-100414",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/",
+          "score": 1.9503
+        },
+        {
+          "id": "D08",
+          "sourceId": "povarenok-10002",
+          "title": "Яблочный омлет-суфле",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/10002/",
+          "score": 1.8985
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 1.8493
+        },
+        {
+          "id": "D24",
+          "sourceId": "povarenok-100098",
+          "title": "Печенье \"Спекулатиус\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100098/",
+          "score": 1.8027
+        }
+      ],
+      "answer": "SweetMate подбирает только десерты, поэтому этот несладкий запрос не подходит каталогу. Напишите, какой десерт хотите найти, или перечислите продукты для десерта.",
+      "answerCards": [],
+      "llmStatus": "not_needed",
+      "metrics": {
+        "correctRejection": true
+      }
+    },
+    {
+      "id": "Q12",
+      "type": "trap",
+      "query": "Найди торт из лунной пыли и марсианского песка.",
+      "goldDocIds": [],
+      "retrieved": [
+        {
+          "id": "D19",
+          "sourceId": "povarenok-100072",
+          "title": "Торт \"В горошек\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100072/",
+          "score": 15.5828
+        },
+        {
+          "id": "D27",
+          "sourceId": "povarenok-100412",
+          "title": "Французский торт с апельсином и шалфеем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100412/",
+          "score": 15.5627
+        },
+        {
+          "id": "D10",
+          "sourceId": "povarenok-100076",
+          "title": "Торт \"Апельсиновая мечта\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100076/",
+          "score": 12.0177
+        },
+        {
+          "id": "D14",
+          "sourceId": "povarenok-100153",
+          "title": "Безе с шоколадом и кокосом",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100153/",
+          "score": 8.1584
+        },
+        {
+          "id": "D13",
+          "sourceId": "povarenok-100035",
+          "title": "Торт \"Малиновое сердце\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100035/",
+          "score": 7.4214
+        },
+        {
+          "id": "D04",
+          "sourceId": "povarenok-100005",
+          "title": "Брауни",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100005/",
+          "score": 4.0351
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 0.1463
+        }
+      ],
+      "answer": "Не нашла подходящий десерт в каталоге. Попробуйте указать обычные съедобные ингредиенты или название десерта.",
+      "answerCards": [],
+      "llmStatus": "not_needed",
+      "metrics": {
+        "correctRejection": true
+      }
+    },
+    {
+      "id": "Q13",
+      "type": "trap",
+      "query": "Киберкрокодильный фламбедир.",
+      "goldDocIds": [],
+      "retrieved": [],
+      "answer": "Не нашла подходящий десерт в каталоге. Попробуйте указать обычные съедобные ингредиенты или название десерта.",
+      "answerCards": [],
+      "llmStatus": "not_needed",
+      "metrics": {
+        "correctRejection": true
+      }
+    },
+    {
+      "id": "Q14",
+      "type": "trap",
+      "query": "Подбери пирог из звездной пыли.",
+      "goldDocIds": [],
+      "retrieved": [
+        {
+          "id": "D02",
+          "sourceId": "povarenok-100149",
+          "title": "Веганский тыквенный пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100149/",
+          "score": 9.5123
+        },
+        {
+          "id": "D03",
+          "sourceId": "povarenok-100414",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/",
+          "score": 7.842
+        },
+        {
+          "id": "D29",
+          "sourceId": "povarenok-100078",
+          "title": "Ореховые рогалики из картофельного теста",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100078/",
+          "score": 2.4082
+        },
+        {
+          "id": "D28",
+          "sourceId": "povarenok-100070",
+          "title": "Брауни тарт",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100070/",
+          "score": 0.852
+        }
+      ],
+      "answer": "Не нашла подходящий десерт в каталоге. Попробуйте указать обычные съедобные ингредиенты или название десерта.",
+      "answerCards": [],
+      "llmStatus": "not_needed",
+      "metrics": {
+        "correctRejection": true
+      }
+    },
+    {
+      "id": "Q15",
+      "type": "trap",
+      "query": "Подбери печенье из метеоритной крошки и облачной ваты.",
+      "goldDocIds": [],
+      "retrieved": [
+        {
+          "id": "D24",
+          "sourceId": "povarenok-100098",
+          "title": "Печенье \"Спекулатиус\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100098/",
+          "score": 19.4691
+        },
+        {
+          "id": "D22",
+          "sourceId": "povarenok-100043",
+          "title": "Печенье \"Сладкие пельмени\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100043/",
+          "score": 16.4079
+        },
+        {
+          "id": "D25",
+          "sourceId": "povarenok-100216",
+          "title": "Миндальное печенье \"В подарок\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100216/",
+          "score": 11.5997
+        },
+        {
+          "id": "D12",
+          "sourceId": "povarenok-100114",
+          "title": "Творожные пирожные",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100114/",
+          "score": 8.1757
+        },
+        {
+          "id": "D11",
+          "sourceId": "povarenok-100111",
+          "title": "Кексы \"Праздничные\"",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100111/",
+          "score": 0.2682
+        },
+        {
+          "id": "D27",
+          "sourceId": "povarenok-100412",
+          "title": "Французский торт с апельсином и шалфеем",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100412/",
+          "score": 0.1597
+        },
+        {
+          "id": "D30",
+          "sourceId": "povarenok-100115",
+          "title": "Шоколадный кекс на минералке",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100115/",
+          "score": 0.1403
+        },
+        {
+          "id": "D26",
+          "sourceId": "povarenok-100409",
+          "title": "Йогуртовый десерт с курагой",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100409/",
+          "score": 0.1069
+        },
+        {
+          "id": "D03",
+          "sourceId": "povarenok-100414",
+          "title": "Австралийский банановый пирог",
+          "sourceUrl": "https://www.povarenok.ru/recipes/show/100414/",
+          "score": 0.1048
+        }
+      ],
+      "answer": "Не нашла подходящий десерт в каталоге. Попробуйте указать обычные съедобные ингредиенты или название десерта.",
+      "answerCards": [],
+      "llmStatus": "not_needed",
+      "metrics": {
+        "correctRejection": true
+      }
+    }
+  ],
+  "generatedAt": "2026-11-28T06:49:54.011Z"
+}

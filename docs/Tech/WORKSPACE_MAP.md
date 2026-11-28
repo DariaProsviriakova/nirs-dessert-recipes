@@ -8,8 +8,8 @@
 | backend/ | HTTP API, авторизация, SQLite, диалог и LLM |
 | backend/tests/ | Backend- и браузерные сценарии |
 | bm25/src/ | Токенизация, запросы и ранжирование |
-| bm25/scripts/ | Загрузка данных, индекс и benchmark |
-| bm25/data/ | Ручная разметка и локальные генерируемые данные |
+| bm25/scripts/ | Загрузка данных, индекс и два benchmark |
+| bm25/data/ | Ручная разметка, локальные данные и фиксированный учебный набор |
 | sweetmate-frontend/src/ | React, API-клиент и административная панель |
 | sweetmate-frontend/public/images/ | Статические изображения и заглушка |
 | docs/Product/ | Продуктовая постановка |

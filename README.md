@@ -49,6 +49,7 @@ NIRS Dessert Recipes — учебный проект сайта SweetMate для
 - [Текущий статус](STATUS.md)
 - [Product](docs/Product/README.md), [Tech](docs/Tech/README.md), [Service](docs/Service/README.md)
 - [BM25 и benchmark](docs/Tech/06-bm25-and-benchmark.md)
+- [Учебный RAG benchmark по занятию 3](docs/Tech/07-course-rag-benchmark.md)
 - [История изменений](CHANGE_HISTORY.md)
 
 Корневые команды проверок: npm test, npm run test:e2e и npm run build. Команда в package.json не означает, что проверка уже выполнялась; результаты записываются в docs/Service/verification.md.
